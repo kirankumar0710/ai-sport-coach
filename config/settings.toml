@@ -1,0 +1,33 @@
+# AI Sports Coach configuration.
+#
+# Secrets never live here. Each provider names the environment variable that
+# holds its key; export it from your shell, e.g.
+#   export PROVIDER=gemini
+#   export GEMINI_API_KEY=...
+#
+# The PROVIDER env var overrides `llm.default_provider`.
+# The MODEL env var (optional) overrides the selected provider's model.
+
+[app]
+name = "AI Sports Coach"
+data_dir = "data/workouts"   # relative to the project root
+
+[llm]
+default_provider = "gemini"
+
+# Generation parameters shared by all providers (per-provider values below win).
+temperature = 0.3
+max_output_tokens = 2048
+
+[llm.providers.gemini]
+model = "gemini-2.5-flash"
+api_key_env = "GEMINI_API_KEY"
+
+[llm.providers.anthropic]
+model = "claude-sonnet-5-5"
+api_key_env = "ANTHROPIC_API_KEY"
+
+[llm.providers.openai]
+model = "gpt-4.1"
+api_key_env = "OPENAI_API_KEY"
+# base_url = "https://api.openai.com/v1"   # optional: proxies / compatible endpoints
