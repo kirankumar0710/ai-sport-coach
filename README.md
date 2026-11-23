@@ -8,7 +8,8 @@ Cycle 1 uses **Google ADK** as the harness. **Gemini** runs natively, and
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ## Configuration
@@ -32,9 +33,9 @@ The TOML file only stores the *name* of each key's environment variable
 ## Run
 
 ```bash
-.venv/bin/sport-coach              # console chat via the ADK Runner
-.venv/bin/sport-coach --trace      # also print tool calls and results
-.venv/bin/adk web adk_apps         # ADK dev UI (run from the repo root)
+python -m sport_coach.cli              # console chat via the ADK Runner
+python -m sport_coach.cli --trace      # also print tool calls and results
+adk web adk_apps                       # ADK dev UI (run from the repo root)
 ```
 
 Try: *"Analyse my workouts and tell me how consistent I've been."*
@@ -42,12 +43,13 @@ Try: *"Analyse my workouts and tell me how consistent I've been."*
 ## Layout
 
 ```
+requirements.txt                dependencies
 config/settings.toml            vendors, models, params (no secrets)
-src/sport_coach/config.py       TOML + env loading → Settings
-src/sport_coach/llm/factory.py  provider registry → ADK model (native Gemini / LiteLlm)
-src/sport_coach/tools/          deterministic workout analytics (function tools)
-src/sport_coach/agents/         agents (Phase 1: workout_agent)
-src/sport_coach/cli.py          Runner + session + event loop
+sport_coach/config.py           TOML + env loading → Settings
+sport_coach/llm/factory.py      provider registry → ADK model (native Gemini / LiteLlm)
+sport_coach/tools/              deterministic workout analytics (function tools)
+sport_coach/agents/             agents (Phase 1: workout_agent)
+sport_coach/cli.py              Runner + session + event loop
 adk_apps/coach/                 `root_agent` entry point for `adk web` / `adk run`
 data/workouts/                  workout CSVs (date, activity, distance_km, duration_min, calories)
 ```
@@ -62,5 +64,5 @@ You don't need to change any agents or tools.
 ## Tests
 
 ```bash
-.venv/bin/pytest
+pytest
 ```

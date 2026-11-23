@@ -1,8 +1,8 @@
 """Interactive console coach built on the ADK Runner.
 
     export PROVIDER=gemini GEMINI_API_KEY=...
-    sport-coach            # or: python -m sport_coach.cli
-    sport-coach --trace    # also print tool calls / results (execution events)
+    python -m sport_coach.cli
+    python -m sport_coach.cli --trace   # also print tool calls / results
 """
 
 from __future__ import annotations
