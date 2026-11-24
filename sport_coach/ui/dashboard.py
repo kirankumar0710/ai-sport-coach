@@ -24,11 +24,36 @@ _WARNING = "#fab219"
 _JUMP = f">{workouts.VOLUME_JUMP_WARN_PCT:.0f}% jump"
 
 
-def _series_color() -> str:
+# Chart labels: a mid-grey that stays readable on both light and dark surfaces
+# (the reported theme isn't reliable enough to switch colours on).
+_LABEL = "#8a8a85"
+
+# Chart panels: rounded card, neutral edge and a soft shadow. Translucent
+# colours keep it working in both themes without detecting which is active.
+_PANEL_CSS = """
+        border: 1px solid rgba(128, 128, 128, .28) !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .14), 0 6px 18px rgba(0, 0, 0, .16);"""
+
+
+def _theme() -> str:
     try:
-        return _SERIES.get(st.context.theme.type or "light", _SERIES["light"])
+        return "dark" if st.context.theme.type == "dark" else "light"
     except AttributeError:  # older Streamlit without st.context.theme
-        return _SERIES["light"]
+        return "light"
+
+
+def _series_color() -> str:
+    return _SERIES[_theme()]
+
+
+def _inject_panel_css() -> None:
+    st.html(f"""<style>
+    [class*="st-key-panel-"] {{
+        border-radius: 14px !important;{_PANEL_CSS}
+        padding: 16px 18px 8px !important;
+    }}
+    [class*="st-key-panel-ph-"] {{ opacity: .6; box-shadow: none; }}
+    </style>""")
 
 
 def _fmt_duration(minutes: float) -> str:
@@ -84,7 +109,7 @@ def _weekly_distance(wdf, rdf, color):
     )
     labels = (
         alt.Chart(wdf[wdf["volume_jump_warning"]])
-        .mark_text(dy=-8, fontSize=11)
+        .mark_text(dy=-8, fontSize=11, fontWeight="bold", color=_LABEL)
         .encode(x=_WEEK_X, y="distance_km:Q", text=alt.Text("change:N"))
     )
     return bars + labels
@@ -118,11 +143,10 @@ PANELS: tuple[Panel, ...] = (
 )
 
 
-def _placeholder(title: str, missing: set[str]) -> None:
+def _placeholder(key: str, title: str, missing: set[str]) -> None:
     names = " and ".join(FIELDS[f].label.lower() for f in sorted(missing, key=COLUMNS.index))
-    with st.container(border=True):
-        st.markdown(f"<span style='opacity:.55'><b>{title}</b><br>No {names} data in this file</span>",
-                    unsafe_allow_html=True)
+    with st.container(border=True, key=f"panel-ph-{key}"):
+        st.markdown(f"**{title}**  \nNo {names} data in this file")
 
 
 # --- Page ----------------------------------------------------------------------
@@ -186,19 +210,20 @@ def render(rows: list[workouts.Workout]) -> None:
     shown = [p for p in PANELS if p.needs <= have]
     hidden = [p for p in PANELS if not p.needs <= have]
 
+    _inject_panel_css()
     for i in range(0, len(shown), 2):
-        pair = st.columns(2)
-        for col, panel in zip(pair, shown[i:i + 2]):
-            with col:
+        pair = st.columns(2, gap="medium")
+        for j, (col, panel) in enumerate(zip(pair, shown[i:i + 2])):
+            with col, st.container(border=True, key=f"panel-{i + j}"):
                 st.markdown(f"**{panel.title}**")
                 st.altair_chart(panel.build(wdf, rdf, color), width="stretch")
 
     if hidden:
         st.caption("Not in this file")
-        cols = st.columns(min(len(hidden), 4))
+        cols = st.columns(min(len(hidden), 4), gap="medium")
         for i, panel in enumerate(hidden):
             with cols[i % len(cols)]:
-                _placeholder(panel.title, set(panel.needs) - have)
+                _placeholder(str(i), panel.title, set(panel.needs) - have)
 
     # --- Table views (only columns with data) --------------------------------
     with st.expander("Weekly table"):

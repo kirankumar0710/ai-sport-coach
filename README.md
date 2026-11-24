@@ -58,7 +58,7 @@ Only `date` plus one measurement is required; any other column can be empty.
 ### Importing workouts
 
 Upload any table with a header row: a watch-app export, a spreadsheet or your own log,
-in any language ([sport_coach/ingest.py](sport_coach/ingest.py)):
+in any language ([sport_coach/ingest/](sport_coach/ingest/)):
 
 1. **Read**: CSV/TSV/TXT (any delimiter or encoding) or Excel/ODS. Title rows above the header are ignored.
 2. **Already our template?** Then it's imported as is.
@@ -101,7 +101,13 @@ config/settings.toml            vendors, models, params (no secrets)
 sport_coach/config.py           TOML + env loading → Settings
 sport_coach/service.py          CoachService (async) + SyncCoachService (for Streamlit)
 sport_coach/schema.py           the workout template (single source of truth)
-sport_coach/ingest.py           import: read any table, map headers (AI + rules), convert into the template
+sport_coach/ingest/             import any file into the template:
+  parsers.py                      cell values (numbers, durations, dates); does a column fit a field
+  rules.py                        built-in header matching (fallback / gap-filler for the AI)
+  reader.py                       file -> table, header-row and sheet detection
+  mapping.py                      template / AI / rules -> column + unit mapping
+  convert.py                      copy data into the template, convert units, skip bad rows
+  pipeline.py                     import_file + the result shown to the user
 sport_coach/workouts.py         canonical CSV parsing, validation, storage, statistics
 sport_coach/llm/factory.py      provider registry → ADK model (native Gemini / LiteLlm)
 sport_coach/tools/              function tools wrapping workouts.py
