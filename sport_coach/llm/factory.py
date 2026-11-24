@@ -43,10 +43,19 @@ def build_model(cfg: ProviderConfig) -> AdkModel:
     return builder(cfg)
 
 
-def build_generation_config(cfg: ProviderConfig) -> types.GenerateContentConfig | None:
-    """Provider-neutral generation params; ADK maps them for every backend."""
+def build_generation_config(
+    cfg: ProviderConfig, temperature: float | None = None
+) -> types.GenerateContentConfig | None:
+    """Provider-neutral generation params; ADK maps them for every backend.
+
+    `temperature` overrides the configured value for one agent (e.g. 0 for the
+    deterministic header mapper). It is dropped for providers whose models
+    don't accept a temperature (`supports_temperature = false` in settings.toml).
+    """
     params = {
-        "temperature": cfg.temperature,
+        "temperature": (temperature if temperature is not None else cfg.temperature)
+        if cfg.supports_temperature
+        else None,
         "max_output_tokens": cfg.max_output_tokens,
     }
     params = {k: v for k, v in params.items() if v is not None}

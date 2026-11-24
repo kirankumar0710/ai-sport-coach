@@ -32,6 +32,9 @@ class ProviderConfig:
     base_url: str | None = None
     temperature: float | None = None
     max_output_tokens: int | None = None
+    # Some models (e.g. newer Claude models) reject sampling params such as
+    # temperature. When False, no temperature is ever sent to this provider.
+    supports_temperature: bool = True
 
 
 @dataclass(frozen=True)
@@ -94,6 +97,7 @@ def load_settings(
             base_url=p.get("base_url"),
             temperature=p.get("temperature", llm.get("temperature")),
             max_output_tokens=p.get("max_output_tokens", llm.get("max_output_tokens")),
+            supports_temperature=bool(p.get("supports_temperature", True)),
         ),
         available_providers=tuple(sorted(providers)),
     )

@@ -36,8 +36,11 @@ There are exactly **two call sites**, both agents run by ADK through `CoachServi
 
 | ⚡ Call site | Triggered by | What is sent to the model | Calls | Temperature |
 |---|---|---|---|---|
-| **Workout Agent** ([workout_agent.py](../sport_coach/agents/workout_agent.py)) | Every chat message | Instruction (+ selected file), conversation history, tool schemas, tool results | 1 + one per tool round (typically 2–3 per message) | 0.3 (`settings.toml`) |
-| **Header Mapper Agent** ([header_mapper.py](../sport_coach/agents/header_mapper.py)) | Upload of a file in a **new** format | Template field descriptions, the file's headers, **5 sample rows** | At most 1 per new header set (then cached) | 0 |
+| **Workout Agent** ([workout_agent.py](../sport_coach/agents/workout_agent.py)) | Every chat message | Instruction (+ selected file), conversation history, tool schemas, tool results | 1 + one per tool round (typically 2–3 per message) | 0.3 (`settings.toml`)¹ |
+| **Header Mapper Agent** ([header_mapper.py](../sport_coach/agents/header_mapper.py)) | Upload of a file in a **new** format | Template field descriptions, the file's headers, **5 sample rows** | At most 1 per new header set (then cached) | 0¹ |
+
+¹ Not sent to providers with `supports_temperature = false` in `settings.toml` (Anthropic: current
+Claude models reject sampling parameters), so they use the model's default.
 
 **Never** calling a model: the dashboard, statistics, unit conversion, CSV parsing,
 uploads already in our template, and uploads whose header set is in the cache.

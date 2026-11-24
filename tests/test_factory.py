@@ -52,3 +52,26 @@ def test_header_mapper_output_parsing():
                    "units": {"distance_km": "km"}, "date_order": None}
     with pytest.raises(ValidationError):  # field must be a template field
         parse_mapper_output('{"matches": [{"field": "speed", "column": "x"}]}')
+
+
+def test_temperature_dropped_for_providers_that_reject_it():
+    claude = ProviderConfig("anthropic", "claude-sonnet-5-5", "ANTHROPIC_API_KEY", "k",
+                            temperature=0.3, max_output_tokens=100, supports_temperature=False)
+    assert build_generation_config(claude).temperature is None
+    assert build_generation_config(claude, temperature=0).temperature is None  # override dropped too
+    assert build_generation_config(claude).max_output_tokens == 100
+
+
+def test_temperature_override_applies_where_supported():
+    gemini = ProviderConfig("gemini", "gemini-2.5-flash", "GEMINI_API_KEY", "k", temperature=0.3)
+    assert build_generation_config(gemini).temperature == 0.3
+    assert build_generation_config(gemini, temperature=0).temperature == 0
+
+
+def test_shipped_settings_disable_temperature_for_anthropic():
+    from sport_coach.config import load_settings
+
+    s = load_settings(env={"PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "k"})
+    assert s.provider.supports_temperature is False
+    s = load_settings(env={"PROVIDER": "gemini", "GEMINI_API_KEY": "k"})
+    assert s.provider.supports_temperature is True
