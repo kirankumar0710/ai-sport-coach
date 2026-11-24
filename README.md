@@ -38,28 +38,45 @@ python -m sport_coach.cli --trace     # console chat (prints tool calls)
 ```
 
 The web app has:
-- **Upload**: a workout CSV or Excel file (.xlsx/.xls) in the sidebar. It's validated before saving; invalid files are rejected with the line number.
-- **Dashboard**: workouts, distance, time, average pace, workouts per week and longest run.
-  Charts show weekly distance (weeks with more than a 10% jump are flagged), pace per run,
-  long-run progression and workouts per week, with a period filter and table views.
+- **Upload**: any workout CSV/TSV or Excel/ODS export in the sidebar. If it doesn't match our template,
+  it is mapped automatically and you get a summary of the mapping plus a download of the processed CSV.
+- **Dashboard**: headline numbers and charts (weekly distance with >10% jumps flagged, pace, long run,
+  frequency, training time, calories, heart rate, elevation, cadence). Each panel needs certain
+  template fields; panels for data your file doesn't have are shown as placeholders.
 - **Coach**: chat with the agent about the selected file, with live tool-call status.
 
 The dashboard works without an API key; only the chat needs one.
 
-### Workout file format
+### Workout template
 
-CSV, or Excel (.xlsx / .xls) with the headers in row 1 of the first sheet.
+The app stores every file in one CSV template ([sport_coach/schema.py](sport_coach/schema.py)):
 
-| column | required | example |
-|---|---|---|
-| `date` | yes | `2026-09-01` |
-| `distance_km` | yes | `5.0` |
-| `duration_min` | yes | `29.5` |
-| `activity` | no | `run` |
-| `calories` | no | `360` |
+`date, activity, distance_km, duration_min, pace_min_per_km, calories, avg_hr, max_hr, elevation_gain_m, cadence_spm, notes`
 
-Excel date cells can be real dates, `YYYY-MM-DD` text or serial numbers.
-All uploads are converted to CSV and saved in `data/workouts/`. Git ignores them because they're personal data;
+Only `date` plus one measurement is required; any other column can be empty.
+
+### Importing workouts
+
+Upload any table with a header row: a watch-app export, a spreadsheet or your own log,
+in any language ([sport_coach/ingest.py](sport_coach/ingest.py)):
+
+1. **Read**: CSV/TSV/TXT (any delimiter or encoding) or Excel/ODS. Title rows above the header are ignored.
+2. **Already our template?** Then it's imported as is.
+3. **Otherwise, map headers to the template**:
+   - with an API key, the **Header Mapper agent** (LLM, structured output) gets the headers plus
+     5 sample rows and returns which column fills each template field and its unit. Answers are cached
+     per header set, so a given export format costs one model call.
+   - **built-in rules** (synonyms, close spelling) fill any gaps, and do all the mapping without a key.
+   - every match is checked against the column's values, so a wrong guess is dropped.
+4. **Copy the data into the template in Python**: unit conversion (km/mi/m, min/s/h, h:mm:ss, pace,
+   ft), date formats, Excel cells. Pace, duration or distance are calculated when two of them are known.
+   The LLM never touches the values.
+5. **Save and report**: "Your file didn't match our template, so we mapped it automatically", listing
+   what was mapped, what was calculated, what isn't in the file and which rows were skipped (e.g. a
+   `TOTAL` row), with a **Download processed CSV** button.
+
+Header names and 5 sample rows are sent to the configured LLM provider when an API key is set.
+Imports are saved in `data/workouts/`; git ignores them because they're personal data, and
 only `sample_runs.csv` is tracked.
 
 ## Architecture
@@ -83,11 +100,13 @@ requirements.txt                dependencies
 config/settings.toml            vendors, models, params (no secrets)
 sport_coach/config.py           TOML + env loading → Settings
 sport_coach/service.py          CoachService (async) + SyncCoachService (for Streamlit)
-sport_coach/workouts.py         CSV/Excel parsing, validation, storage, statistics
+sport_coach/schema.py           the workout template (single source of truth)
+sport_coach/ingest.py           import: read any table, map headers (AI + rules), convert into the template
+sport_coach/workouts.py         canonical CSV parsing, validation, storage, statistics
 sport_coach/llm/factory.py      provider registry → ADK model (native Gemini / LiteLlm)
 sport_coach/tools/              function tools wrapping workouts.py
-sport_coach/agents/             agents (Phase 1: workout_agent)
-sport_coach/ui/                 dashboard and chat components
+sport_coach/agents/             workout_agent (coach), header_mapper (import)
+sport_coach/ui/                 dashboard, upload notice and chat components
 sport_coach/cli.py              console interface
 data/workouts/                  workout CSVs
 ```

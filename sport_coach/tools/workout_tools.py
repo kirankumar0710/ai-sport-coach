@@ -23,7 +23,9 @@ def make_workout_tools(data_dir: Path) -> list:
 
     def summarize_workouts(file_name: str) -> dict:
         """Compute overall statistics for a workout CSV file: totals, averages,
-        average pace, workouts per week, fastest and longest workouts.
+        average pace, workouts per week, fastest and longest workouts, heart rate,
+        elevation and cadence - whichever the file has. `available_metrics` and
+        `not_available` say what the file records.
 
         Args:
             file_name: Name of the CSV file, e.g. "sample_runs.csv".
@@ -35,9 +37,10 @@ def make_workout_tools(data_dir: Path) -> list:
         return {"status": "success", **workouts.summarize(rows)}
 
     def weekly_trends(file_name: str) -> dict:
-        """Break a workout CSV file down by ISO week: distance, workout count,
-        average pace, long run, week-over-week volume change in percent, and a
-        warning flag when volume rose more than 10%.
+        """Break a workout CSV file down by ISO week: workout count, distance,
+        duration, average pace, long run, calories, heart rate, elevation, and
+        week-over-week distance change with a warning flag above 10%.
+        Values are null when the file has no data for them.
 
         Args:
             file_name: Name of the CSV file, e.g. "sample_runs.csv".

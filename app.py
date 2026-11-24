@@ -5,10 +5,10 @@
 
 import streamlit as st
 
-from sport_coach import workouts
+from sport_coach import ingest, workouts
 from sport_coach.config import ConfigError, Settings, load_settings
 from sport_coach.service import SyncCoachService
-from sport_coach.ui import chat, dashboard
+from sport_coach.ui import chat, dashboard, uploads
 from sport_coach.workouts import WorkoutDataError
 
 st.set_page_config(page_title="AI Sports Coach", page_icon="🏃", layout="wide")
@@ -20,7 +20,11 @@ def get_coach(provider_label: str, _settings: Settings) -> SyncCoachService:
     return SyncCoachService(_settings)
 
 
-# The dashboard works without an API key; only chat needs one.
+def _coach_key(s: Settings) -> str:
+    return f"{s.provider.name}/{s.provider.model}"
+
+
+# The dashboard works without an API key; only chat (and AI header mapping) need one.
 try:
     settings = load_settings(require_api_key=False)
 except ConfigError as exc:
@@ -34,31 +38,28 @@ with st.sidebar:
     st.header("🏃 Workouts")
 
     upload = st.file_uploader(
-        "Upload workouts (CSV or Excel)", type=list(workouts.UPLOAD_TYPES)
+        "Upload workouts (CSV or Excel)", type=list(ingest.UPLOAD_TYPES)
     )
-    if upload is not None and st.session_state.get("last_upload_id") != upload.file_id:
-        st.session_state["last_upload_id"] = upload.file_id
-        try:
-            name, count = workouts.save_upload(data_dir, upload.name, upload.getvalue())
-            st.session_state["active_file"] = name
-            st.success(f"Saved **{name}** ({count} workouts)")
-        except WorkoutDataError as exc:
-            st.error(f"Upload rejected: {exc}")
+    # With an API key, headers are mapped by the LLM; otherwise by built-in rules.
+    coach = get_coach(_coach_key(settings), settings) if settings.provider.api_key else None
+    uploads.handle(upload, data_dir, coach.map_headers if coach else None)
 
-    with st.expander("Expected file format"):
+    with st.expander("Which files work?"):
         st.markdown(
-            "Required columns: `date` (YYYY-MM-DD), `distance_km`, `duration_min`  \n"
-            "Optional: `activity`, `calories`  \n"
-            "Excel (.xlsx / .xls): the first sheet is used, with the same column "
-            "headers in row 1. Date cells can be real Excel dates."
+            "Any CSV, TSV or Excel/ODS export with a header row: from a watch app, "
+            "a spreadsheet or your own log, in any language. Columns are mapped to our "
+            "template automatically and units are converted.  \n"
+            "Needed: a **date** plus at least one measurement (distance, duration, pace, "
+            "calories, heart rate, …). Panels for data your file doesn't have are left empty."
         )
         st.download_button(
-            "Download template", dashboard.sample_csv(), "workouts_template.csv", "text/csv"
+            "Download our template", dashboard.template_csv(), "workouts_template.csv", "text/csv"
         )
 
     files = workouts.list_files(data_dir)
     if not files:
         st.info("Upload a CSV or Excel file to get started.")
+        uploads.render_notice()
         st.stop()
 
     current = st.session_state.get("active_file")
@@ -66,12 +67,18 @@ with st.sidebar:
         "Workout file", files, index=files.index(current) if current in files else 0
     )
     st.session_state["active_file"] = active_file
+    st.download_button(
+        "Download this file", workouts.resolve_file(data_dir, active_file).read_bytes(),
+        active_file, "text/csv", width="stretch",
+    )
 
     st.divider()
     st.caption(f"Model: {settings.provider.name} · {settings.provider.model}")
 
 # --- Main area -------------------------------------------------------------
 st.title(settings.app_name)
+
+uploads.render_notice()
 
 try:
     rows = workouts.load_workouts(data_dir, active_file)
@@ -91,5 +98,4 @@ with tab_chat:
             "and restart the app."
         )
     else:
-        coach = get_coach(f"{settings.provider.name}/{settings.provider.model}", settings)
         chat.render(coach, active_file)

@@ -36,3 +36,19 @@ def test_agent_tool_schemas_expose_parameters():
     assert set(decls) == {"list_workout_files", "summarize_workouts", "weekly_trends"}
     schema = decls["summarize_workouts"].parameters_json_schema
     assert schema["required"] == ["file_name"]
+
+
+def test_header_mapper_output_parsing():
+    import pytest
+    from pydantic import ValidationError
+
+    from sport_coach.agents.header_mapper import parse_mapper_output
+
+    out = parse_mapper_output(
+        '```json\n{"matches": [{"field": "distance_km", "column": "Strecke", "unit": "km"},'
+        ' {"field": "date", "column": "Datum"}], "date_order": "unknown"}\n```'
+    )
+    assert out == {"columns": {"distance_km": "Strecke", "date": "Datum"},
+                   "units": {"distance_km": "km"}, "date_order": None}
+    with pytest.raises(ValidationError):  # field must be a template field
+        parse_mapper_output('{"matches": [{"field": "speed", "column": "x"}]}')

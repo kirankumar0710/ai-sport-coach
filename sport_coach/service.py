@@ -15,10 +15,16 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
+from sport_coach.agents.header_mapper import (
+    build_header_mapper_agent,
+    mapper_input,
+    parse_mapper_output,
+)
 from sport_coach.agents.workout_agent import build_workout_agent
 from sport_coach.config import Settings
 
 APP_NAME = "sport_coach"
+MAPPER_USER = "importer"
 
 EventKind = Literal["tool_call", "tool_result", "message"]
 
@@ -42,6 +48,11 @@ class CoachService:
         self._runner = Runner(
             app_name=APP_NAME,
             agent=build_workout_agent(settings),
+            session_service=self._sessions,
+        )
+        self._mapper_runner = Runner(
+            app_name=APP_NAME,
+            agent=build_header_mapper_agent(settings),
             session_service=self._sessions,
         )
 
@@ -84,6 +95,20 @@ class CoachService:
                     )
 
 
+    async def map_headers(self, headers: list[str], sample_rows: list[list[str]]) -> dict[str, Any]:
+        """One-shot structured call: user headers -> template field mapping."""
+        session_id = await self.new_session(MAPPER_USER)
+        message = types.Content(role="user", parts=[types.Part(text=mapper_input(headers, sample_rows))])
+        final = ""
+        async for event in self._mapper_runner.run_async(
+            user_id=MAPPER_USER, session_id=session_id, new_message=message
+        ):
+            if event.is_final_response() and event.content and event.content.parts:
+                final = "".join(p.text or "" for p in event.content.parts if not p.thought)
+        await self._sessions.delete_session(app_name=APP_NAME, user_id=MAPPER_USER, session_id=session_id)
+        return parse_mapper_output(final)
+
+
 class SyncCoachService:
     """Blocking facade for synchronous UIs such as Streamlit.
 
@@ -111,6 +136,9 @@ class SyncCoachService:
 
     def new_session(self, user_id: str) -> str:
         return self._call(self._service.new_session(user_id))
+
+    def map_headers(self, headers: list[str], sample_rows: list[list[str]]) -> dict[str, Any]:
+        return self._call(self._service.map_headers(headers, sample_rows))
 
     def chat(
         self, user_id: str, session_id: str, text: str, context: dict[str, Any] | None = None
