@@ -51,7 +51,7 @@ def _series_color() -> str:
     return _SERIES[_theme()]
 
 
-def _inject_panel_css() -> None:
+def inject_panel_css() -> None:
     st.html(f"""<style>
     [class*="st-key-panel-"] {{
         border-radius: 14px !important;{_PANEL_CSS}
@@ -215,7 +215,7 @@ def render(rows: list[workouts.Workout]) -> None:
     shown = [p for p in PANELS if p.needs <= have]
     hidden = [p for p in PANELS if not p.needs <= have]
 
-    _inject_panel_css()
+    inject_panel_css()
     for i in range(0, len(shown), 2):
         pair = st.columns(2, gap="medium")
         for j, (col, panel) in enumerate(zip(pair, shown[i:i + 2])):

@@ -11,13 +11,14 @@ import sys
 
 from sport_coach.config import ConfigError, load_settings
 from sport_coach.service import CoachService
+from sport_coach.usage import UsageStore
 
 USER_ID = "local_user"
 
 
 async def chat(trace: bool) -> None:
     settings = load_settings()
-    coach = CoachService(settings)
+    coach = CoachService(settings, UsageStore(settings.usage_db))
     session_id = await coach.new_session(USER_ID)
 
     print(f"{settings.app_name} — {coach.provider_label}. Type 'exit' to quit.\n")

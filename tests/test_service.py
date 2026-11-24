@@ -9,7 +9,7 @@ from sport_coach.service import CoachEvent, SyncCoachService
 class FakeCoach:
     provider_label = "fake · model"
 
-    def __init__(self, settings):
+    def __init__(self, settings, usage=None):
         pass
 
     async def new_session(self, user_id):

@@ -10,6 +10,7 @@ a model (LLM) API is called.
 - [1. Uploading a file](#1-uploading-a-file)
 - [2. Computing the dashboard graphs](#2-computing-the-dashboard-graphs)
 - [3. Chatting with the coach](#3-chatting-with-the-coach)
+- [Usage tracking (Admin tab)](#usage-tracking-admin-tab)
 
 ---
 
@@ -267,3 +268,28 @@ event loop because the Gemini and LiteLLM clients can't be shared across event l
 
 **Notes:** chat needs an API key. Sessions are in memory, so a restart starts a new
 conversation (long-term memory and persistence come in Phase 3).
+
+---
+
+## Usage tracking (Admin tab)
+
+Every model call passes through `CoachService`, so usage is recorded in one place:
+[`CoachService._tracked()`](../sport_coach/service.py) wraps both agent runs and writes one row
+per model response to SQLite ([usage.py](../sport_coach/usage.py), `data/usage.db`).
+
+| Field | Source |
+|---|---|
+| provider, model | the active `ProviderConfig` |
+| agent | the ADK event author (`workout_agent`, `header_mapper`) |
+| input / output / cached tokens | `event.usage_metadata`, filled by ADK for Gemini and by LiteLLM for other vendors (output includes thinking tokens) |
+| latency | time since the run started or the last tool result, i.e. how long the model took for that step |
+| status, error | `error` rows are written when a run fails, then the error is re-raised |
+
+Only counts and timings are stored: no prompts, replies or workout data. Cost is calculated
+when the tab is shown, from token counts × `[pricing]` in `settings.toml`; models without a
+price show tokens but no cost. Bookkeeping failures are ignored, so they can never break a chat
+or an import.
+
+The [Admin tab](../sport_coach/ui/admin.py) shows the active configuration (never the key itself)
+and, for a chosen period, totals, a breakdown by provider/model/agent, tokens per day and the
+most recent calls. The history can be cleared there.

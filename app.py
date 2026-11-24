@@ -10,7 +10,8 @@ import streamlit as st
 from sport_coach import ingest, workouts
 from sport_coach.config import ConfigError, Settings, load_settings
 from sport_coach.service import SyncCoachService
-from sport_coach.ui import chat, dashboard, uploads
+from sport_coach.ui import admin, chat, dashboard, uploads
+from sport_coach.usage import UsageStore
 from sport_coach.workouts import WorkoutDataError
 
 ASSETS = Path(__file__).parent / "assets"
@@ -23,9 +24,14 @@ st.logo(ICON, size="large", icon_image=ICON)
 
 
 @st.cache_resource(show_spinner=False)
+def get_usage_store(path: str) -> UsageStore:
+    return UsageStore(path)
+
+
+@st.cache_resource(show_spinner=False)
 def get_coach(provider_label: str, _settings: Settings) -> SyncCoachService:
     """One coach per process and provider/model (keyed on the label)."""
-    return SyncCoachService(_settings)
+    return SyncCoachService(_settings, get_usage_store(str(_settings.usage_db)))
 
 
 def _coach_key(s: Settings) -> str:
@@ -96,7 +102,7 @@ except WorkoutDataError as exc:
     st.error(f"Could not read {active_file}: {exc}")
     st.stop()
 
-tab_dash, tab_chat = st.tabs(["📊 Dashboard", "💬 Coach"])
+tab_dash, tab_chat, tab_admin = st.tabs(["📊 Dashboard", "💬 Coach", "🛠️ Admin"])
 
 with tab_dash:
     dashboard.render(rows)
@@ -109,3 +115,6 @@ with tab_chat:
         )
     else:
         chat.render(coach, active_file)
+
+with tab_admin:
+    admin.render(settings, get_usage_store(str(settings.usage_db)))

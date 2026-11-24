@@ -33,6 +33,9 @@ export SPORT_COACH_CONFIG=...     # optional: use another TOML file
 The TOML file only stores the *name* of each key's environment variable
 (`api_key_env`), never the key itself.
 
+For cost estimates in the Admin tab, add your models' prices (USD per 1 million tokens, from each
+vendor's pricing page) under `[pricing]` in `settings.toml`. Without them the tab shows tokens only.
+
 ## Run
 
 ```bash
@@ -47,6 +50,8 @@ The web app has:
   frequency, training time, calories, heart rate, elevation, cadence). Each panel needs certain
   template fields; panels for data your file doesn't have are shown as placeholders.
 - **Coach**: chat with the agent about the selected file, with live tool-call status.
+- **Admin**: provider configuration and LLM usage: calls, input/output tokens, estimated cost,
+  response times and errors, by provider, model and agent, per day.
 
 The dashboard works without an API key; only the chat needs one.
 
@@ -121,12 +126,14 @@ ai-sport-coach/
 │   ├── overview.svg            # system overview image
 │   └── ARCHITECTURE.md         # detailed flows and LLM call points
 ├── data/
-│   └── workouts/               # template CSVs (only sample_runs.csv is tracked)
+│   ├── workouts/               # template CSVs (only sample_runs.csv is tracked)
+│   └── usage.db                # LLM usage log (not tracked)
 ├── sport_coach/
 │   ├── config.py               # TOML + env vars → Settings
 │   ├── schema.py               # the workout template (single source of truth)
 │   ├── service.py              # CoachService (async) + SyncCoachService (Streamlit)
 │   ├── workouts.py             # template CSV parsing, storage, statistics
+│   ├── usage.py                # LLM call log (SQLite) + cost estimates
 │   ├── cli.py                  # console interface
 │   ├── agents/
 │   │   ├── workout_agent.py    # coach: answers via tools          ⚡ LLM
@@ -150,10 +157,11 @@ ai-sport-coach/
 │   └── ui/
 │       ├── dashboard.py        # tiles + panels driven by available data
 │       ├── uploads.py          # upload handling + "mapped automatically" notice
-│       └── chat.py             # coach chat with live tool-call status
+│       ├── chat.py             # coach chat with live tool-call status
+│       └── admin.py            # provider config + LLM usage, tokens, cost
 └── tests/
     ├── fixtures/               # runs_legacy.xls
-    └── test_*.py               # agents, config, ingest, providers, service, tools, workouts
+    └── test_*.py               # agents, config, ingest, providers, service, tools, usage, workouts
 ```
 
 ### Adding a provider

@@ -38,11 +38,34 @@ class ProviderConfig:
 
 
 @dataclass(frozen=True)
+class ModelPrice:
+    """USD per 1 million tokens, for cost estimates in the Admin tab."""
+
+    input_per_mtok: float
+    output_per_mtok: float
+
+
+@dataclass(frozen=True)
 class Settings:
     app_name: str
     data_dir: Path
     provider: ProviderConfig
     available_providers: tuple[str, ...]
+    usage_db: Path = PROJECT_ROOT / "data" / "usage.db"
+    pricing: dict[str, ModelPrice] = field(default_factory=dict)  # model name -> price
+
+
+def _load_pricing(raw: Mapping[str, Any]) -> dict[str, ModelPrice]:
+    prices = {}
+    for model, p in raw.items():
+        try:
+            prices[model] = ModelPrice(float(p["input"]), float(p["output"]))
+        except (KeyError, TypeError, ValueError):
+            raise ConfigError(
+                f"[pricing] entry for '{model}' needs numeric input and output, "
+                f'e.g. "{model}" = {{ input = 1.25, output = 10.0 }}'
+            ) from None
+    return prices
 
 
 def load_settings(
@@ -93,9 +116,15 @@ def load_settings(
     if not data_dir.is_absolute():
         data_dir = PROJECT_ROOT / data_dir
 
+    usage_db = Path(app.get("usage_db", "data/usage.db"))
+    if not usage_db.is_absolute():
+        usage_db = PROJECT_ROOT / usage_db
+
     return Settings(
         app_name=app.get("name", "AI Sports Coach"),
         data_dir=data_dir,
+        usage_db=usage_db,
+        pricing=_load_pricing(raw.get("pricing", {})),
         provider=ProviderConfig(
             name=name,
             model=model,

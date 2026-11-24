@@ -8,9 +8,11 @@ types) stays in here, so the harness can be swapped without touching any UI.
 import asyncio
 import queue
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Iterator, Literal
 
+from google.adk.events import Event
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
@@ -22,6 +24,7 @@ from sport_coach.agents.header_mapper import (
 )
 from sport_coach.agents.workout_agent import build_workout_agent
 from sport_coach.config import Settings
+from sport_coach.usage import UsageRecord, UsageStore, now
 
 APP_NAME = "sport_coach"
 MAPPER_USER = "importer"
@@ -42,8 +45,9 @@ class CoachEvent:
 
 
 class CoachService:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, usage: UsageStore | None = None):
         self.settings = settings
+        self._usage = usage  # optional LLM call log (Admin tab)
         self._sessions = InMemorySessionService()
         self._runner = Runner(
             app_name=APP_NAME,
@@ -59,6 +63,46 @@ class CoachService:
     @property
     def provider_label(self) -> str:
         return f"{self.settings.provider.name} · {self.settings.provider.model}"
+
+    # --- Usage tracking ------------------------------------------------------
+
+    def _record(self, agent: str, **fields: Any) -> None:
+        if self._usage is None:
+            return
+        try:
+            self._usage.add(UsageRecord(
+                ts=now(), provider=self.settings.provider.name,
+                model=self.settings.provider.model, agent=agent, **fields,
+            ))
+        except Exception:  # never let bookkeeping break a chat or an import
+            pass
+
+    async def _tracked(self, agent: str, events: AsyncIterator[Event]) -> AsyncIterator[Event]:
+        """Pass ADK events through, logging one usage row per model response.
+
+        Latency is the time since the run started or since the last tool result,
+        i.e. how long the model took to answer that step.
+        """
+        mark = time.perf_counter()
+        try:
+            async for event in events:
+                if event.usage_metadata is not None:
+                    u = event.usage_metadata
+                    self._record(
+                        event.author or agent,
+                        input_tokens=u.prompt_token_count or 0,
+                        output_tokens=(u.candidates_token_count or 0) + (u.thoughts_token_count or 0),
+                        cached_tokens=u.cached_content_token_count or 0,
+                        latency_ms=round((time.perf_counter() - mark) * 1000),
+                    )
+                    mark = time.perf_counter()
+                elif event.get_function_responses():
+                    mark = time.perf_counter()  # the next model call starts after the tools ran
+                yield event
+        except Exception as exc:
+            self._record(agent, latency_ms=round((time.perf_counter() - mark) * 1000),
+                         status="error", error=f"{type(exc).__name__}: {exc}"[:500])
+            raise
 
     async def new_session(self, user_id: str) -> str:
         session = await self._sessions.create_session(app_name=APP_NAME, user_id=user_id)
@@ -77,12 +121,12 @@ class CoachService:
         agent knows what the user is looking at in the UI.
         """
         message = types.Content(role="user", parts=[types.Part(text=text)])
-        async for event in self._runner.run_async(
+        async for event in self._tracked("workout_agent", self._runner.run_async(
             user_id=user_id,
             session_id=session_id,
             new_message=message,
             state_delta=context or None,
-        ):
+        )):
             for call in event.get_function_calls():
                 yield CoachEvent("tool_call", event.author, call.name, dict(call.args or {}))
             for resp in event.get_function_responses():
@@ -100,9 +144,9 @@ class CoachService:
         session_id = await self.new_session(MAPPER_USER)
         message = types.Content(role="user", parts=[types.Part(text=mapper_input(headers, sample_rows))])
         final = ""
-        async for event in self._mapper_runner.run_async(
+        async for event in self._tracked("header_mapper", self._mapper_runner.run_async(
             user_id=MAPPER_USER, session_id=session_id, new_message=message
-        ):
+        )):
             if event.is_final_response() and event.content and event.content.parts:
                 final = "".join(p.text or "" for p in event.content.parts if not p.thought)
         await self._sessions.delete_session(app_name=APP_NAME, user_id=MAPPER_USER, session_id=session_id)
@@ -119,13 +163,13 @@ class SyncCoachService:
 
     _DONE = object()
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, usage: UsageStore | None = None):
         self._loop = asyncio.new_event_loop()
         threading.Thread(target=self._loop.run_forever, daemon=True, name="coach-loop").start()
-        self._service = self._call(self._create(settings))
+        self._service = self._call(self._create(settings, usage))
 
-    async def _create(self, settings: Settings) -> CoachService:
-        return CoachService(settings)
+    async def _create(self, settings: Settings, usage: UsageStore | None) -> CoachService:
+        return CoachService(settings, usage)
 
     def _call(self, coro):
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result()

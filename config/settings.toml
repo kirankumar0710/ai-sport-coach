@@ -11,6 +11,7 @@
 [app]
 name = "AI Sports Coach"
 data_dir = "data/workouts"   # relative to the project root
+usage_db = "data/usage.db"   # LLM call log for the Admin tab (counts only, no workout data)
 
 [llm]
 default_provider = "gemini"
@@ -35,3 +36,11 @@ api_key_env = "ANTHROPIC_API_KEY"
 model = "gpt-4.1"
 api_key_env = "OPENAI_API_KEY"
 # base_url = "https://api.openai.com/v1"   # optional: proxies / compatible endpoints
+
+# Optional: model prices for cost estimates in the Admin tab, in USD per 1 million
+# tokens. Prices change: copy current ones from each vendor's pricing page. Models
+# without an entry show tokens but no cost.
+[pricing]
+# "gemini-3.8-flash"  = { input = 0.00, output = 0.00 }
+# "claude-sonnet-5-5" = { input = 0.00, output = 0.00 }
+# "gpt-4.1"           = { input = 0.00, output = 0.00 }
