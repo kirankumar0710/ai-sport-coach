@@ -33,7 +33,9 @@ data_dir = settings.data_dir
 with st.sidebar:
     st.header("🏃 Workouts")
 
-    upload = st.file_uploader("Upload a workout CSV", type=["csv"])
+    upload = st.file_uploader(
+        "Upload workouts (CSV or Excel)", type=list(workouts.UPLOAD_TYPES)
+    )
     if upload is not None and st.session_state.get("last_upload_id") != upload.file_id:
         st.session_state["last_upload_id"] = upload.file_id
         try:
@@ -43,10 +45,12 @@ with st.sidebar:
         except WorkoutDataError as exc:
             st.error(f"Upload rejected: {exc}")
 
-    with st.expander("Expected CSV format"):
+    with st.expander("Expected file format"):
         st.markdown(
             "Required columns: `date` (YYYY-MM-DD), `distance_km`, `duration_min`  \n"
-            "Optional: `activity`, `calories`"
+            "Optional: `activity`, `calories`  \n"
+            "Excel (.xlsx / .xls): the first sheet is used, with the same column "
+            "headers in row 1. Date cells can be real Excel dates."
         )
         st.download_button(
             "Download template", dashboard.sample_csv(), "workouts_template.csv", "text/csv"
@@ -54,7 +58,7 @@ with st.sidebar:
 
     files = workouts.list_files(data_dir)
     if not files:
-        st.info("Upload a CSV to get started.")
+        st.info("Upload a CSV or Excel file to get started.")
         st.stop()
 
     current = st.session_state.get("active_file")

@@ -38,7 +38,7 @@ python -m sport_coach.cli --trace     # console chat (prints tool calls)
 ```
 
 The web app has:
-- **Upload**: a workout CSV in the sidebar. It's validated before saving; invalid files are rejected with the line number.
+- **Upload**: a workout CSV or Excel file (.xlsx/.xls) in the sidebar. It's validated before saving; invalid files are rejected with the line number.
 - **Dashboard**: workouts, distance, time, average pace, workouts per week and longest run.
   Charts show weekly distance (weeks with more than a 10% jump are flagged), pace per run,
   long-run progression and workouts per week, with a period filter and table views.
@@ -46,7 +46,9 @@ The web app has:
 
 The dashboard works without an API key; only the chat needs one.
 
-### Workout CSV format
+### Workout file format
+
+CSV, or Excel (.xlsx / .xls) with the headers in row 1 of the first sheet.
 
 | column | required | example |
 |---|---|---|
@@ -56,7 +58,8 @@ The dashboard works without an API key; only the chat needs one.
 | `activity` | no | `run` |
 | `calories` | no | `360` |
 
-Uploads are saved in `data/workouts/`. Git ignores them because they're personal data;
+Excel date cells can be real dates, `YYYY-MM-DD` text or serial numbers.
+All uploads are converted to CSV and saved in `data/workouts/`. Git ignores them because they're personal data;
 only `sample_runs.csv` is tracked.
 
 ## Architecture
@@ -80,7 +83,7 @@ requirements.txt                dependencies
 config/settings.toml            vendors, models, params (no secrets)
 sport_coach/config.py           TOML + env loading → Settings
 sport_coach/service.py          CoachService (async) + SyncCoachService (for Streamlit)
-sport_coach/workouts.py         CSV parsing, validation, storage, statistics
+sport_coach/workouts.py         CSV/Excel parsing, validation, storage, statistics
 sport_coach/llm/factory.py      provider registry → ADK model (native Gemini / LiteLlm)
 sport_coach/tools/              function tools wrapping workouts.py
 sport_coach/agents/             agents (Phase 1: workout_agent)

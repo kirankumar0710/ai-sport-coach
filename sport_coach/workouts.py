@@ -8,7 +8,7 @@ import csv
 import io
 import re
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -88,15 +88,61 @@ def load_workouts(data_dir: Path, file_name: str) -> list[Workout]:
     return parse_workouts(resolve_file(data_dir, file_name).read_text(encoding="utf-8"))
 
 
-def save_upload(data_dir: Path, file_name: str, content: bytes) -> tuple[str, int]:
-    """Validate an uploaded CSV and store it. Returns (stored name, workout count).
+UPLOAD_TYPES = ("csv", "xlsx", "xls")
+_EXCEL_EPOCH = datetime(1899, 12, 30)  # Excel serial day 0 (1900 date system)
 
-    Invalid files are rejected before anything is written.
+
+def _excel_date_cell(value: Any) -> str:
+    """Normalise an Excel date cell to YYYY-MM-DD; leave anything else as text."""
+    if value is None or (isinstance(value, float) and value != value):  # NaN
+        return ""
+    if isinstance(value, datetime):  # includes pandas.Timestamp
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, (int, float)):  # date stored as a serial number
+        return (_EXCEL_EPOCH + timedelta(days=float(value))).date().isoformat()
+    return str(value).strip()
+
+
+def excel_to_csv(content: bytes) -> str:
+    """Convert the first sheet of an Excel workbook to CSV text.
+
+    Blank rows are kept (and later skipped by the parser) so that error line
+    numbers match the row numbers the user sees in Excel.
     """
+    import pandas as pd  # only needed for Excel uploads
+
+    try:  # calamine reads both .xlsx and legacy .xls
+        df = pd.read_excel(io.BytesIO(content), sheet_name=0, dtype=object, engine="calamine")
+    except Exception as exc:  # corrupt file, wrong format, password-protected...
+        raise WorkoutDataError(f"Could not read Excel file: {exc}") from None
+
+    df.columns = [str(c).strip() for c in df.columns]
+    if "date" in df.columns:
+        df["date"] = df["date"].map(_excel_date_cell)
+    return df.to_csv(index=False)
+
+
+def _upload_to_csv(file_name: str, content: bytes) -> str:
+    suffix = Path(file_name).suffix.lower()
+    if suffix in (".xlsx", ".xls"):
+        return excel_to_csv(content)
+    if suffix != ".csv":
+        raise WorkoutDataError(f"Unsupported file type '{suffix}'. Use: {', '.join(UPLOAD_TYPES)}")
     try:
-        text = content.decode("utf-8")
+        return content.decode("utf-8")
     except UnicodeDecodeError:
         raise WorkoutDataError("File is not UTF-8 text") from None
+
+
+def save_upload(data_dir: Path, file_name: str, content: bytes) -> tuple[str, int]:
+    """Validate an uploaded CSV/Excel file and store it as CSV.
+
+    Returns (stored name, workout count). Invalid files are rejected before
+    anything is written. Excel workbooks are converted from their first sheet.
+    """
+    text = _upload_to_csv(file_name, content)
     rows = parse_workouts(text)
 
     stem = _SAFE_NAME.sub("_", Path(file_name).stem).strip("._") or "workouts"
