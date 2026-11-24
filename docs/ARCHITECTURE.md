@@ -292,4 +292,5 @@ or an import.
 
 The [Admin tab](../sport_coach/ui/admin.py) shows the active configuration (never the key itself)
 and, for a chosen period, totals, a breakdown by provider/model/agent, tokens per day and the
-most recent calls. The history can be cleared there.
+most recent calls. The refresh icon next to the heading re-reads the log (with an "Updated" time
+to confirm), and the history can be cleared there.

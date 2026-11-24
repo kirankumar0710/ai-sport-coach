@@ -70,7 +70,16 @@ def render(settings: Settings, store: UsageStore) -> None:
     st.subheader("Configuration")
     _config_table(settings)
 
-    st.subheader("LLM usage")
+    # Heading with a refresh icon at the right end. Every rerun re-reads the log,
+    # so clicking it simply reruns the page; the toast and timestamp confirm it.
+    with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"):
+        st.subheader("LLM usage")
+        refreshed = st.button("", icon=":material/refresh:", key="admin_refresh",
+                              help="Refresh: reload the latest usage from the log")
+    if refreshed:
+        st.toast("Usage statistics refreshed", icon=":material/check_circle:")
+    st.caption(f"Updated {datetime.now():%H:%M:%S}")
+
     period = st.segmented_control("Period", PERIODS, default="7 days", key="admin_period") or "7 days"
     records = store.records(_since(period))
     if not records:
