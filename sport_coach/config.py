@@ -32,9 +32,9 @@ class ProviderConfig:
     base_url: str | None = None
     temperature: float | None = None
     max_output_tokens: int | None = None
-    # Some models (e.g. newer Claude models) reject sampling params such as
-    # temperature. When False, no temperature is ever sent to this provider.
-    supports_temperature: bool = True
+    # None = use the vendor default (providers/<vendor>.py); true/false in
+    # settings.toml overrides it, e.g. for a model that rejects temperature.
+    supports_temperature: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -82,6 +82,13 @@ def load_settings(
             f"Provider '{name}' needs an API key. Run: export {key_env}=<your key>"
         )
 
+    supports_temperature = p.get("supports_temperature")
+    if supports_temperature is not None and not isinstance(supports_temperature, bool):
+        raise ConfigError(
+            f"supports_temperature for '{name}' must be true or false (no quotes), "
+            f"got {supports_temperature!r}"
+        )
+
     data_dir = Path(app.get("data_dir", "data/workouts"))
     if not data_dir.is_absolute():
         data_dir = PROJECT_ROOT / data_dir
@@ -97,7 +104,7 @@ def load_settings(
             base_url=p.get("base_url"),
             temperature=p.get("temperature", llm.get("temperature")),
             max_output_tokens=p.get("max_output_tokens", llm.get("max_output_tokens")),
-            supports_temperature=bool(p.get("supports_temperature", True)),
+            supports_temperature=supports_temperature,
         ),
         available_providers=tuple(sorted(providers)),
     )

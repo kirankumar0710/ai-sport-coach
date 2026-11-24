@@ -19,6 +19,10 @@ default_provider = "gemini"
 temperature = 0.3
 max_output_tokens = 2048
 
+# Each vendor's adapter lives in sport_coach/providers/<vendor>.py and knows that
+# vendor's defaults (e.g. Anthropic sends no temperature). Per provider you can
+# override with:  supports_temperature = true | false
+
 [llm.providers.gemini]
 model = "gemini-3.8-flash"
 api_key_env = "GEMINI_API_KEY"
@@ -26,7 +30,6 @@ api_key_env = "GEMINI_API_KEY"
 [llm.providers.anthropic]
 model = "claude-sonnet-5-5"
 api_key_env = "ANTHROPIC_API_KEY"
-supports_temperature = false   # current Claude models reject temperature/top_p
 
 [llm.providers.openai]
 model = "gpt-4.1"

@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from sport_coach.config import Settings
 from sport_coach.ingest import UNIT_FACTORS
-from sport_coach.llm.factory import build_generation_config, build_model
+from sport_coach.providers import build_generation_config, build_model
 from sport_coach.schema import COLUMNS, TEMPLATE
 
 TemplateFieldName = Literal[tuple(COLUMNS)]  # type: ignore[valid-type]
@@ -62,7 +62,7 @@ def build_header_mapper_agent(settings: Settings) -> LlmAgent:
         name="header_mapper",
         description="Maps user workout-file headers onto the app template.",
         model=build_model(settings.provider),
-        # temperature 0 where the provider allows it; dropped otherwise (see factory)
+        # temperature 0 where the model allows it; dropped otherwise (see providers/)
         generate_content_config=build_generation_config(settings.provider, temperature=0),
         instruction=INSTRUCTION,
         output_schema=HeaderMappingResult,

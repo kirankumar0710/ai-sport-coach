@@ -19,14 +19,14 @@ a model (LLM) API is called.
 |---|---|---|---|
 | **Interfaces** | [app.py](../app.py), [ui/](../sport_coach/ui/), [cli.py](../sport_coach/cli.py) | Upload, dashboard, coach chat | Application layer, domain. **Never ADK.** |
 | **Application layer** | [service.py](../sport_coach/service.py) | Entry point for all agent work: `chat()` and `map_headers()`. Converts ADK events into our own `CoachEvent`s | Harness |
-| **Agent harness** | Google ADK + [agents/](../sport_coach/agents/) | Runs agents: the loop of model calls and tool calls, plus sessions | LLM layer, tools |
-| **LLM layer** | [llm/factory.py](../sport_coach/llm/factory.py), [config.py](../sport_coach/config.py) | Turns `PROVIDER` + `settings.toml` into a model ADK can call | Vendor APIs |
+| **Agent harness** | Google ADK + [agents/](../sport_coach/agents/) | Runs agents: the loop of model calls and tool calls, plus sessions | Providers, tools |
+| **Providers** | [providers/](../sport_coach/providers/), [config.py](../sport_coach/config.py) | One adapter per vendor ([gemini.py](../sport_coach/providers/gemini.py), [anthropic.py](../sport_coach/providers/anthropic.py), [openai.py](../sport_coach/providers/openai.py)) turns `PROVIDER` + `settings.toml` into a model and generation settings ADK can use | Vendor APIs |
 | **Domain** | [workouts.py](../sport_coach/workouts.py), [ingest/](../sport_coach/ingest/), [tools/](../sport_coach/tools/), [schema.py](../sport_coach/schema.py) | Template, import, statistics, tools. Plain Python, no model calls | Nothing above it |
 | **Data** | `data/workouts/` | Template CSVs and the header-mapping cache | — |
 
 The **harness** (ADK) and the **LLM** are separate things. ADK decides *when* to
 call a model and runs the tools the model asks for; the model is reached through
-the LLM layer. Swapping Gemini for Claude changes the LLM layer only.
+the provider adapters. Swapping Gemini for Claude changes which adapter is used, nothing else.
 
 ---
 
@@ -39,8 +39,8 @@ There are exactly **two call sites**, both agents run by ADK through `CoachServi
 | **Workout Agent** ([workout_agent.py](../sport_coach/agents/workout_agent.py)) | Every chat message | Instruction (+ selected file), conversation history, tool schemas, tool results | 1 + one per tool round (typically 2–3 per message) | 0.3 (`settings.toml`)¹ |
 | **Header Mapper Agent** ([header_mapper.py](../sport_coach/agents/header_mapper.py)) | Upload of a file in a **new** format | Template field descriptions, the file's headers, **5 sample rows** | At most 1 per new header set (then cached) | 0¹ |
 
-¹ Not sent to providers with `supports_temperature = false` in `settings.toml` (Anthropic: current
-Claude models reject sampling parameters), so they use the model's default.
+¹ Not sent where the model rejects it: the Anthropic adapter's default (current Claude models
+reject sampling parameters), or any provider with `supports_temperature = false` in `settings.toml`.
 
 **Never** calling a model: the dashboard, statistics, unit conversion, CSV parsing,
 uploads already in our template, and uploads whose header set is in the cache.
@@ -49,19 +49,22 @@ uploads already in our template, and uploads whose header set is in the cache.
 
 ```mermaid
 flowchart LR
-    A["Agent<br/>(ADK LlmAgent)"] --> F["llm/factory.py<br/>build_model()"]
-    F -- "PROVIDER=gemini" --> G["model name, e.g. 'gemini-2.5-flash'<br/>→ ADK's Gemini model class"]
+    A["Agent<br/>(ADK LlmAgent)"] --> F["providers/<br/>build_model()"]
+    F -- "PROVIDER=gemini" --> G["gemini.py: model name<br/>→ ADK's Gemini model class"]
     G --> GA["google-genai SDK<br/>→ Gemini API"]
-    F -- "PROVIDER=anthropic / openai" --> L["ADK LiteLlm wrapper"]
+    F -- "PROVIDER=anthropic / openai" --> L["anthropic.py / openai.py:<br/>ADK LiteLlm wrapper"]
     L --> LA["LiteLLM → Anthropic / OpenAI API"]
     style GA fill:#e8f0fe,stroke:#1a73e8,stroke-width:2px
 ```
 
-- **Gemini (default):** the factory returns the model name; ADK resolves it to its
+- **Gemini (default):** [gemini.py](../sport_coach/providers/gemini.py) returns the model name; ADK resolves it to its
   built-in Gemini model, which calls the Gemini API through Google's `google-genai`
   SDK. `GEMINI_API_KEY` is passed to that SDK as `GOOGLE_API_KEY`.
-- **Anthropic / OpenAI:** the factory wraps the model in ADK's `LiteLlm`, and LiteLLM
+- **Anthropic / OpenAI:** [anthropic.py](../sport_coach/providers/anthropic.py) and
+  [openai.py](../sport_coach/providers/openai.py) wrap the model in ADK's `LiteLlm`, and LiteLLM
   translates ADK's requests into each vendor's API.
+- **Generation settings:** each adapter decides what its vendor accepts. For example, the
+  Anthropic adapter never sends a temperature, because current Claude models reject one.
 - **Structured output** (Header Mapper): ADK sends the Pydantic schema as Gemini's
   response schema, or as a LiteLLM `response_format` for other vendors. Either way the
   reply is validated with Pydantic before use.

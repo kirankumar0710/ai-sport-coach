@@ -122,8 +122,13 @@ ai-sport-coach/
 │   ├── agents/
 │   │   ├── workout_agent.py    # coach: answers via tools          ⚡ LLM
 │   │   └── header_mapper.py    # maps file headers → template      ⚡ LLM
-│   ├── llm/
-│   │   └── factory.py          # provider registry → ADK model (Gemini / LiteLLM)
+│   ├── providers/              # one adapter per LLM vendor
+│   │   ├── __init__.py         # registry + build_model() / build_generation_config()
+│   │   ├── base.py             # Provider interface and defaults
+│   │   ├── gemini.py           # native in ADK (google-genai)
+│   │   ├── anthropic.py        # via LiteLLM; sends no temperature
+│   │   ├── openai.py           # via LiteLLM; optional base_url
+│   │   └── _litellm.py         # shared LiteLLM wrapping
 │   ├── tools/
 │   │   └── workout_tools.py    # function tools over workouts.py
 │   ├── ingest/                 # import any file into the template
@@ -139,15 +144,20 @@ ai-sport-coach/
 │       └── chat.py             # coach chat with live tool-call status
 └── tests/
     ├── fixtures/               # runs_legacy.xls
-    └── test_*.py               # config, factory, ingest, service, tools, workouts
+    └── test_*.py               # agents, config, ingest, providers, service, tools, workouts
 ```
 
 ### Adding a provider
 
-1. Add a `[llm.providers.<name>]` section to `settings.toml`.
-2. Register a builder in `llm/factory.py` with `@register_provider("<name>")`.
+1. Create `sport_coach/providers/<name>.py` with a `Provider` subclass: set `name`, implement
+   `build_model()`, and override defaults where the vendor differs (e.g. `supports_temperature = False`).
+   For a vendor LiteLLM supports, subclass `LiteLlmProvider` and set `prefix`; that's usually all.
+2. Add it to `PROVIDERS` in `sport_coach/providers/__init__.py`.
+3. Add a `[llm.providers.<name>]` section to `settings.toml`.
 
-You don't need to change any agents, tools or UI.
+You don't need to change any agents, tools or UI. A model that differs from its vendor's default
+(e.g. an OpenAI reasoning model that rejects temperature) is handled in `settings.toml` with
+`supports_temperature = true | false`.
 
 ## Tests
 

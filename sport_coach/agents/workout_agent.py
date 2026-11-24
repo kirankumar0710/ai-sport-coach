@@ -4,7 +4,7 @@ from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
 
 from sport_coach.config import Settings
-from sport_coach.llm.factory import build_generation_config, build_model
+from sport_coach.providers import build_generation_config, build_model
 from sport_coach.tools.workout_tools import make_workout_tools
 
 INSTRUCTION = """\
