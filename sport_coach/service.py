@@ -23,6 +23,7 @@ from sport_coach.agents.header_mapper import (
     parse_mapper_output,
 )
 from sport_coach.agents.workout_agent import build_workout_agent
+from sport_coach import pricing
 from sport_coach.config import Settings
 from sport_coach.usage import UsageRecord, UsageStore, now
 
@@ -70,9 +71,15 @@ class CoachService:
         if self._usage is None:
             return
         try:
+            cfg = self.settings.provider
+            price = pricing.lookup(cfg.name, cfg.model, self.settings.pricing)  # price right now
+            cost = None
+            if price is not None and fields.get("status", "ok") == "ok":
+                cost = pricing.cost_usd(price, fields.get("input_tokens", 0),
+                                        fields.get("output_tokens", 0), fields.get("cached_tokens", 0))
             self._usage.add(UsageRecord(
-                ts=now(), provider=self.settings.provider.name,
-                model=self.settings.provider.model, agent=agent, **fields,
+                ts=now(), provider=cfg.name, model=cfg.model, agent=agent,
+                cost_usd=cost, price_source=price.source if price else None, **fields,
             ))
         except Exception:  # never let bookkeeping break a chat or an import
             pass

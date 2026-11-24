@@ -1,8 +1,8 @@
 """Admin tab: provider configuration and LLM usage (calls, tokens, cost, latency).
 
-Reads the usage log written by CoachService (sport_coach.usage). Costs come
-from the optional [pricing] table in settings.toml; models without a price
-show tokens but no cost.
+Reads the usage log written by CoachService (sport_coach.usage). Each call's
+cost was calculated when it happened, at the price in effect then (LiteLLM's
+price list, or [pricing] in settings.toml, which wins) - see sport_coach.pricing.
 """
 
 from datetime import datetime, time, timedelta
@@ -11,10 +11,11 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from sport_coach import pricing
 from sport_coach.config import Settings
 from sport_coach.providers import get_provider
 from sport_coach.ui.dashboard import inject_panel_css
-from sport_coach.usage import UsageStore, cost_usd
+from sport_coach.usage import UsageRecord, UsageStore
 
 PERIODS = ("Today", "7 days", "30 days", "All time")
 _INPUT, _OUTPUT = "#2a78d6", "#eb6834"  # categorical slots 1 and 2 of the reference palette
@@ -37,10 +38,43 @@ def _money(v: float | None) -> str:
     return f"${v:,.4f}" if v < 1 else f"${v:,.2f}"
 
 
+def _row_cost(rec: UsageRecord, settings: Settings) -> tuple[float | None, str]:
+    """Stored cost (priced when the call happened). Calls logged before costs were
+    stored are priced now, and labelled so."""
+    if rec.cost_usd is not None:
+        return rec.cost_usd, rec.price_source or ""
+    if rec.status == "ok":
+        price = pricing.lookup(rec.provider, rec.model, settings.pricing)
+        if price is not None:
+            cost = pricing.cost_usd(price, rec.input_tokens, rec.output_tokens, rec.cached_tokens)
+            return cost, f"{price.source}, priced later"
+    return None, ""
+
+
+def _price_text(price: pricing.Price | None) -> str:
+    if price is None:
+        return "unknown: add it under [pricing] in settings.toml"
+    cached = f" · cached input {price.cached_input_per_mtok:g}" if price.cached_input_per_mtok is not None else ""
+    return f"input {price.input_per_mtok:g} · output {price.output_per_mtok:g}{cached}  ({price.source})"
+
+
+def _price_list_text() -> str:
+    info = pricing.price_list_info()
+    if info is None:
+        return "price list status unknown"
+    when = ""
+    if info.loaded_at:
+        loaded = datetime.fromisoformat(info.loaded_at).astimezone()
+        when = f", loaded {loaded:%d %b %H:%M}"
+    if info.source == "live":
+        return f"prices: LiteLLM live price list{when}"
+    return f"prices: LiteLLM bundled copy{when}" + (f" ({info.note})" if info.note else "")
+
+
 def _config_table(settings: Settings) -> None:
     cfg = settings.provider
     provider = get_provider(cfg.name)
-    price = settings.pricing.get(cfg.model)
+    price = pricing.lookup(cfg.name, cfg.model, settings.pricing)
     temp = (f"{cfg.temperature} (header mapper: 0)" if provider.allows_temperature(cfg) and cfg.temperature is not None
             else "not sent: model default")
     rows = [
@@ -50,8 +84,7 @@ def _config_table(settings: Settings) -> None:
         ("Temperature", temp),
         ("Max output tokens", str(cfg.max_output_tokens or "model default")),
         ("Base URL", cfg.base_url or "vendor default"),
-        ("Price (USD / 1M tokens)",
-         f"input {price.input_per_mtok} · output {price.output_per_mtok}" if price else "not configured"),
+        ("Current price (USD / 1M tokens)", _price_text(price)),
         ("Configured providers", ", ".join(settings.available_providers)),
         ("Usage log", str(settings.usage_db)),
     ]
@@ -75,10 +108,18 @@ def render(settings: Settings, store: UsageStore) -> None:
     with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"):
         st.subheader("LLM usage")
         refreshed = st.button("", icon=":material/refresh:", key="admin_refresh",
-                              help="Refresh: reload the latest usage from the log")
+                              help="Refresh: reload usage from the log and fetch the latest model prices")
     if refreshed:
-        st.toast("Usage statistics refreshed", icon=":material/check_circle:")
-    st.caption(f"Updated {datetime.now():%H:%M:%S}")
+        # Refresh = re-read the usage log (every rerun does) + download the latest prices.
+        with st.spinner("Fetching the latest model prices…"):
+            try:
+                info = pricing.refresh_prices()
+                where = "latest prices" if info and info.source == "live" else "bundled prices (offline)"
+                st.toast(f"Usage refreshed · {where}", icon=":material/check_circle:")
+            except Exception as exc:  # keep the current list if the download fails
+                st.toast(f"Usage refreshed · couldn't update prices ({type(exc).__name__})",
+                         icon=":material/warning:")
+    st.caption(f"Updated {datetime.now():%H:%M:%S} · {_price_list_text()}")
 
     period = st.segmented_control("Period", PERIODS, default="7 days", key="admin_period") or "7 days"
     records = store.records(_since(period))
@@ -88,7 +129,9 @@ def render(settings: Settings, store: UsageStore) -> None:
         return
 
     df = pd.DataFrame([r.__dict__ for r in records])
-    df["cost"] = [cost_usd(r, settings.pricing) for r in records]
+    costs = [_row_cost(r, settings) for r in records]
+    df["cost"] = [c for c, _ in costs]
+    df["price_source"] = [src for _, src in costs]
     df["local_ts"] = pd.to_datetime(df["ts"], utc=True).dt.tz_convert(datetime.now().astimezone().tzinfo)
     ok = df[df["status"] == "ok"]
     priced = df["cost"].notna()
@@ -99,11 +142,14 @@ def render(settings: Settings, store: UsageStore) -> None:
     t[1].metric("Input tokens", f"{int(df['input_tokens'].sum()):,}")
     t[2].metric("Output tokens", f"{int(df['output_tokens'].sum()):,}", help="Includes thinking tokens")
     if priced.any():
-        partial = "" if priced.all() else " Excludes calls to models without a price in settings.toml."
+        partial = "" if priced.all() else " Excludes calls to models with no known price."
         t[3].metric("Est. cost", _money(df.loc[priced, "cost"].sum()),
-                    help="Estimate from token counts and [pricing] in settings.toml." + partial)
+                    help="Each call is priced when it happens, at the price in effect then "
+                         "(LiteLLM's price list, or [pricing] in settings.toml), and stored. "
+                         "Estimate: excludes taxes, discounts and free tiers." + partial)
     else:
-        t[3].metric("Est. cost", "–", help="Add model prices under [pricing] in config/settings.toml.")
+        t[3].metric("Est. cost", "–", help="No known price for these models: add them under [pricing] "
+                                          "in config/settings.toml.")
     t[4].metric("Avg response", f"{ok['latency_ms'].mean() / 1000:.1f} s" if len(ok) else "–",
                 help="Time for the model to answer one step (excludes tool execution)")
     t[5].metric("Errors", f"{(df['status'] == 'error').sum():,}")
@@ -165,7 +211,8 @@ def render(settings: Settings, store: UsageStore) -> None:
                 "agent": recent["agent"], "provider": recent["provider"], "model": recent["model"],
                 "input tokens": recent["input_tokens"], "output tokens": recent["output_tokens"],
                 "latency_s": (recent["latency_ms"] / 1000).round(2),
-                "cost": recent["cost"].map(_money), "status": recent["status"],
+                "cost": recent["cost"].map(_money), "price source": recent["price_source"],
+                "status": recent["status"],
                 "error": recent["error"].fillna(""),
             }),
             hide_index=True, width="stretch",

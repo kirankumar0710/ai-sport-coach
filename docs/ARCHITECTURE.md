@@ -284,13 +284,17 @@ per model response to SQLite ([usage.py](../sport_coach/usage.py), `data/usage.d
 | input / output / cached tokens | `event.usage_metadata`, filled by ADK for Gemini and by LiteLLM for other vendors (output includes thinking tokens) |
 | latency | time since the run started or the last tool result, i.e. how long the model took for that step |
 | status, error | `error` rows are written when a run fails, then the error is re-raised |
+| cost_usd, price_source | priced **at call time** ([pricing.py](../sport_coach/pricing.py)): `[pricing]` in `settings.toml` if set, otherwise LiteLLM's current model price list. Cached input tokens use the cached rate where the vendor has one; failed calls cost nothing |
 
-Only counts and timings are stored: no prompts, replies or workout data. Cost is calculated
-when the tab is shown, from token counts × `[pricing]` in `settings.toml`; models without a
-price show tokens but no cost. Bookkeeping failures are ignored, so they can never break a chat
+Only counts, timings and costs are stored: no prompts, replies or workout data. Because each
+call's cost is stored with it, later price changes don't rewrite history. LiteLLM downloads its
+latest price list when first used and falls back to its bundled copy offline. Models with no
+known price show tokens but no cost. Bookkeeping failures are ignored, so they can never break a chat
 or an import.
 
 The [Admin tab](../sport_coach/ui/admin.py) shows the active configuration (never the key itself)
 and, for a chosen period, totals, a breakdown by provider/model/agent, tokens per day and the
-most recent calls. The refresh icon next to the heading re-reads the log (with an "Updated" time
-to confirm), and the history can be cleared there.
+most recent calls. The refresh icon next to the heading re-reads the log and downloads LiteLLM's
+latest price list (the caption shows the time and whether prices are live or the bundled copy);
+already-stored costs keep the price that applied when each call happened. The history can be
+cleared there.

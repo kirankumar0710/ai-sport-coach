@@ -37,9 +37,10 @@ model = "gpt-4.1"
 api_key_env = "OPENAI_API_KEY"
 # base_url = "https://api.openai.com/v1"   # optional: proxies / compatible endpoints
 
-# Optional: model prices for cost estimates in the Admin tab, in USD per 1 million
-# tokens. Prices change: copy current ones from each vendor's pricing page. Models
-# without an entry show tokens but no cost.
+# Model prices for cost tracking (USD per 1 million tokens). Usually not needed:
+# prices come from LiteLLM's current price list automatically. Entries here
+# override it, e.g. for negotiated rates or a model the list doesn't know yet.
+# Each call is priced when it happens and the cost is stored with it.
 [pricing]
 # "gemini-3.8-flash"  = { input = 0.00, output = 0.00 }
 # "claude-sonnet-5-5" = { input = 0.00, output = 0.00 }

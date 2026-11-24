@@ -1,7 +1,8 @@
 """LLM usage log: one row per model call, stored in SQLite for the Admin tab.
 
-Rows hold counts and timings only (provider, model, agent, tokens, latency,
-status). No prompts, replies or workout data are stored.
+Rows hold counts, timings and cost only (provider, model, agent, tokens,
+latency, status, cost at the time of the call and where its price came from).
+No prompts, replies or workout data are stored.
 """
 
 from __future__ import annotations
@@ -12,7 +13,6 @@ from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sport_coach.config import ModelPrice
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS llm_calls (
@@ -26,7 +26,9 @@ CREATE TABLE IF NOT EXISTS llm_calls (
     cached_tokens   INTEGER NOT NULL DEFAULT 0,
     latency_ms      INTEGER NOT NULL DEFAULT 0,
     status          TEXT    NOT NULL,   -- ok | error
-    error           TEXT
+    error           TEXT,
+    cost_usd        REAL,               -- calculated at call time; NULL if no price known
+    price_source    TEXT                -- e.g. "LiteLLM price list (gemini/...)"
 );
 CREATE INDEX IF NOT EXISTS llm_calls_ts ON llm_calls (ts);
 """
@@ -44,6 +46,12 @@ class UsageRecord:
     latency_ms: int = 0
     status: str = "ok"
     error: str | None = None
+    cost_usd: float | None = None      # at the price in effect when the call happened
+    price_source: str | None = None
+
+
+# Columns added after the first release; created on older databases at startup.
+_ADDED_COLUMNS = {"cost_usd": "REAL", "price_source": "TEXT"}
 
 
 def now() -> datetime:
@@ -57,8 +65,12 @@ class UsageStore:
     def __init__(self, path: Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with closing(self._connect()) as db:
+        with closing(self._connect()) as db, db:
             db.executescript(_SCHEMA)
+            existing = {row[1] for row in db.execute("PRAGMA table_info(llm_calls)")}
+            for col, sql_type in _ADDED_COLUMNS.items():
+                if col not in existing:
+                    db.execute(f"ALTER TABLE llm_calls ADD COLUMN {col} {sql_type}")
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path, timeout=10)
@@ -85,11 +97,3 @@ class UsageStore:
     def clear(self) -> int:
         with closing(self._connect()) as db, db:
             return db.execute("DELETE FROM llm_calls").rowcount
-
-
-def cost_usd(rec: UsageRecord, pricing: dict[str, ModelPrice]) -> float | None:
-    """Estimated cost of one call, or None when the model has no configured price."""
-    price = pricing.get(rec.model)
-    if price is None:
-        return None
-    return (rec.input_tokens * price.input_per_mtok + rec.output_tokens * price.output_per_mtok) / 1e6

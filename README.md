@@ -33,8 +33,9 @@ export SPORT_COACH_CONFIG=...     # optional: use another TOML file
 The TOML file only stores the *name* of each key's environment variable
 (`api_key_env`), never the key itself.
 
-For cost estimates in the Admin tab, add your models' prices (USD per 1 million tokens, from each
-vendor's pricing page) under `[pricing]` in `settings.toml`. Without them the tab shows tokens only.
+Costs in the Admin tab use LiteLLM's current model price list automatically. Each call is priced
+when it happens and stored with its price source. To override a price (e.g. negotiated rates, or a
+model the list doesn't know), add it under `[pricing]` in `settings.toml` (USD per 1 million tokens).
 
 ## Run
 
@@ -133,7 +134,8 @@ ai-sport-coach/
 │   ├── schema.py               # the workout template (single source of truth)
 │   ├── service.py              # CoachService (async) + SyncCoachService (Streamlit)
 │   ├── workouts.py             # template CSV parsing, storage, statistics
-│   ├── usage.py                # LLM call log (SQLite) + cost estimates
+│   ├── usage.py                # LLM call log (SQLite), cost stored per call
+│   ├── pricing.py              # model prices: settings.toml override → LiteLLM price list
 │   ├── cli.py                  # console interface
 │   ├── agents/
 │   │   ├── workout_agent.py    # coach: answers via tools          ⚡ LLM
@@ -161,7 +163,7 @@ ai-sport-coach/
 │       └── admin.py            # provider config + LLM usage, tokens, cost
 └── tests/
     ├── fixtures/               # runs_legacy.xls
-    └── test_*.py               # agents, config, ingest, providers, service, tools, usage, workouts
+    └── test_*.py               # agents, config, ingest, pricing, providers, service, tools, usage, workouts
 ```
 
 ### Adding a provider

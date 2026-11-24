@@ -5,9 +5,11 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from google.adk.models.lite_llm import LiteLlm
 
+import sqlite3
+
 from sport_coach.config import ConfigError, ModelPrice, ProviderConfig, Settings, load_settings
 from sport_coach.service import CoachService
-from sport_coach.usage import UsageRecord, UsageStore, cost_usd
+from sport_coach.usage import UsageRecord, UsageStore
 
 T0 = datetime(2026, 11, 20, 10, 0, tzinfo=timezone.utc)
 
@@ -30,10 +32,19 @@ def test_store_round_trip_filter_and_clear(tmp_path):
     assert store.clear() == 2 and store.records() == []
 
 
-def test_cost_needs_a_configured_price():
-    pricing = {"m": ModelPrice(input_per_mtok=2.0, output_per_mtok=10.0)}
-    assert cost_usd(rec(), pricing) == pytest.approx((1000 * 2 + 200 * 10) / 1e6)
-    assert cost_usd(rec(model="other"), pricing) is None
+def test_store_adds_cost_columns_to_an_old_database(tmp_path):
+    path = tmp_path / "usage.db"
+    with sqlite3.connect(path) as db:  # schema from before costs were stored
+        db.execute("CREATE TABLE llm_calls (id INTEGER PRIMARY KEY, ts TEXT NOT NULL, provider TEXT NOT NULL,"
+                   " model TEXT NOT NULL, agent TEXT NOT NULL, input_tokens INTEGER, output_tokens INTEGER,"
+                   " cached_tokens INTEGER, latency_ms INTEGER, status TEXT NOT NULL, error TEXT)")
+        db.execute("INSERT INTO llm_calls VALUES (1, ?, 'gemini', 'm', 'workout_agent', 10, 5, 0, 100, 'ok', NULL)",
+                   (T0.isoformat(),))
+    store = UsageStore(path)
+    (old,) = store.records()
+    assert old.cost_usd is None and old.price_source is None
+    store.add(rec(cost_usd=0.01, price_source="test"))
+    assert store.records()[-1].cost_usd == 0.01
 
 
 def test_pricing_config(tmp_path):
@@ -79,6 +90,9 @@ def test_chat_and_header_mapping_are_logged(tmp_path):
     assert all(r.provider == "anthropic" and r.model == "claude-sonnet-5-5" for r in rows)
     assert all(r.status == "ok" and r.input_tokens > 0 and r.output_tokens > 0 for r in rows)
     assert all(r.latency_ms >= 0 for r in rows)
+    # priced at call time from LiteLLM's list, and the source recorded
+    assert all(r.cost_usd and r.cost_usd > 0 for r in rows)
+    assert all(r.price_source == "LiteLLM price list (claude-sonnet-5-5)" for r in rows)
 
 
 def test_failed_call_is_logged_and_reraised(tmp_path):
@@ -94,6 +108,7 @@ def test_failed_call_is_logged_and_reraised(tmp_path):
 
     (row,) = store.records()
     assert row.status == "error" and "provider down" in row.error
+    assert row.cost_usd is None  # failed calls aren't charged
 
 
 def test_no_store_means_no_logging(tmp_path):
