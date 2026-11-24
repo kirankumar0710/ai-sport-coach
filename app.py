@@ -102,6 +102,13 @@ except WorkoutDataError as exc:
     st.error(f"Could not read {active_file}: {exc}")
     st.stop()
 
+# Main tabs: labels 24px bold (Streamlit default 14px + 10px); Admin pushed to the right edge.
+# Selectors use role/data-testid (stable across Streamlit's tab implementations).
+st.html("""<style>
+.stTabs [role="tablist"] { display: flex; width: 100%; }
+.stTabs [role="tablist"] [data-testid="stTab"] p { font-size: 24px; font-weight: 700; }
+.stTabs [role="tablist"] [data-testid="stTab"]:last-child { margin-left: auto; }
+</style>""")
 tab_dash, tab_chat, tab_admin = st.tabs(["📊 Dashboard", "💬 Coach", "🛠️ Admin"])
 
 with tab_dash:
