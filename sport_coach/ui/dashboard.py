@@ -28,11 +28,16 @@ _JUMP = f">{workouts.VOLUME_JUMP_WARN_PCT:.0f}% jump"
 # (the reported theme isn't reliable enough to switch colours on).
 _LABEL = "#8a8a85"
 
-# Chart panels: rounded card, neutral edge and a soft shadow. Translucent
-# colours keep it working in both themes without detecting which is active.
+# Chart panels: rounded card with elevation. Streamlit has no shadow option, so
+# this is custom CSS. Colours derive from the theme's text colour (currentColor):
+# dark text in light mode -> a dark drop shadow; light text in dark mode -> a soft
+# glow and a slightly lifted surface (a black shadow is invisible on a dark page).
 _PANEL_CSS = """
-        border: 1px solid rgba(128, 128, 128, .28) !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, .14), 0 6px 18px rgba(0, 0, 0, .16);"""
+        border: 1px solid color-mix(in srgb, currentColor 16%, transparent) !important;
+        background: color-mix(in srgb, currentColor 3%, transparent);
+        box-shadow:
+            0 1px 3px color-mix(in srgb, currentColor 14%, transparent),
+            0 8px 24px color-mix(in srgb, currentColor 12%, transparent);"""
 
 
 def _theme() -> str:
@@ -216,7 +221,8 @@ def render(rows: list[workouts.Workout]) -> None:
         for j, (col, panel) in enumerate(zip(pair, shown[i:i + 2])):
             with col, st.container(border=True, key=f"panel-{i + j}"):
                 st.markdown(f"**{panel.title}**")
-                st.altair_chart(panel.build(wdf, rdf, color), width="stretch")
+                chart = panel.build(wdf, rdf, color).properties(background="transparent")  # show card surface
+                st.altair_chart(chart, width="stretch")
 
     if hidden:
         st.caption("Not in this file")
