@@ -94,7 +94,11 @@ title_logo, title_text = st.columns([1, 11], vertical_alignment="center")
 title_logo.image(LOGO, width=84)
 title_text.title(settings.app_name)
 
-uploads.render_notice()
+# The notice comes and goes (e.g. shown once after an upload). Keep it inside a
+# container that always exists, so elements below it - the tabs - never shift
+# position; a shift makes Streamlit rebuild the tabs and jump back to the first.
+with st.container():
+    uploads.render_notice()
 
 try:
     rows = workouts.load_workouts(data_dir, active_file)
@@ -103,7 +107,9 @@ except WorkoutDataError as exc:
     st.stop()
 
 tabs.style_main_tabs()  # browser-style tabs, Admin at the right edge
-tab_dash, tab_chat, tab_admin = st.tabs(["📊 Dashboard", "💬 Coach", "🛠️ Admin"])
+tab_dash, tab_chat, tab_admin = st.tabs(
+    ["📊 Dashboard", "💬 Coach", "🛠️ Admin"], key="main_tabs"  # stable identity across reruns
+)
 
 with tab_dash:
     dashboard.render(rows)
