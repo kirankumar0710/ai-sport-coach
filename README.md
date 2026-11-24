@@ -1,12 +1,11 @@
 <p align="center">
-  <img src="assets/logo.png" alt="AI Sports Coach logo" width="180">
+  <img src="assets/logo.png" alt="AI Running Coach logo" width="180">
 </p>
 
-<h1 align="center">AI Sports Coach</h1>
+<h1 align="center">AI Running Coach</h1>
 
-A multi-agent AI running coach built on a provider-agnostic agent harness.
-Cycle 1 uses **Google ADK** as the harness. **Gemini** runs natively, and
-**Anthropic** and **OpenAI** run through ADK's LiteLLM adapter.
+An intelligent, multi-agent AI running coach designed to analyse running activities, monitor
+performance, provide personalised training plans, and offer coaching insights.
 
 ## Setup
 
@@ -85,11 +84,21 @@ only `sample_runs.csv` is tracked.
 
 ## Architecture
 
-![AI Sports Coach: system overview](docs/overview.svg)
+The application is built on a provider-agnostic **Agent Harness**, designed to support multiple
+LLM providers without coupling the core agent orchestration to any specific vendor.
 
-- **Interfaces** (Streamlit, CLI) talk only to the **application layer** (`CoachService`), the one place that knows the agent harness.
-- The **agent harness** (Google ADK) runs two agents, the **Workout Agent** (chat) and the **Header Mapper** (upload). These are the only ⚡ LLM calls: **Gemini API** by default, Anthropic or OpenAI via LiteLLM.
-- The **domain** (statistics, import pipeline, tools, template) is deterministic Python, so the LLM decides and Python computes.
+The architecture separates:
+
+- **Agent Harness**: agent execution, orchestration, tools, sessions, memory and workflows.
+- **LLM Providers**: Gemini, OpenAI and Anthropic through interchangeable provider integrations.
+- **Application Services**: workout analysis, performance tracking, video analysis and training
+  plan generation.
+- **User Interface**: a web-based interface for interacting with the coach and reviewing performance.
+
+The initial implementation uses **Google ADK** as the agent framework, while keeping the overall
+architecture independent of Google ADK and any specific LLM provider.
+
+![AI Running Coach: system overview](docs/overview.svg)
 
 **Details → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
