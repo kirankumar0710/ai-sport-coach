@@ -10,7 +10,7 @@ import streamlit as st
 from sport_coach import ingest, workouts
 from sport_coach.config import ConfigError, Settings, load_settings
 from sport_coach.service import SyncCoachService
-from sport_coach.ui import admin, chat, dashboard, uploads
+from sport_coach.ui import admin, chat, dashboard, tabs, uploads
 from sport_coach.usage import UsageStore
 from sport_coach.workouts import WorkoutDataError
 
@@ -102,13 +102,7 @@ except WorkoutDataError as exc:
     st.error(f"Could not read {active_file}: {exc}")
     st.stop()
 
-# Main tabs: labels 24px bold (Streamlit default 14px + 10px); Admin pushed to the right edge.
-# Selectors use role/data-testid (stable across Streamlit's tab implementations).
-st.html("""<style>
-.stTabs [role="tablist"] { display: flex; width: 100%; }
-.stTabs [role="tablist"] [data-testid="stTab"] p { font-size: 24px; font-weight: 700; }
-.stTabs [role="tablist"] [data-testid="stTab"]:last-child { margin-left: auto; }
-</style>""")
+tabs.style_main_tabs()  # browser-style tabs, Admin at the right edge
 tab_dash, tab_chat, tab_admin = st.tabs(["📊 Dashboard", "💬 Coach", "🛠️ Admin"])
 
 with tab_dash:
