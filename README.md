@@ -1,4 +1,8 @@
-# AI Sports Coach
+<p align="center">
+  <img src="assets/logo.png" alt="AI Sports Coach logo" width="180">
+</p>
+
+<h1 align="center">AI Sports Coach</h1>
 
 A multi-agent AI running coach built on a provider-agnostic agent harness.
 Cycle 1 uses **Google ADK** as the harness. **Gemini** runs natively, and
@@ -81,16 +85,18 @@ only `sample_runs.csv` is tracked.
 
 ## Architecture
 
-```
-app.py (Streamlit) / sport_coach/cli.py      our interfaces: no ADK imports
-            │  CoachEvent (tool_call / tool_result / message)
-sport_coach/service.py   CoachService        application layer; the only place that knows ADK
-            │
-ADK Runner + workout_agent                   harness (replaceable)
-            │                    │
-llm/factory.py               tools/workout_tools.py → workouts.py
-(Gemini | LiteLLM)           (deterministic statistics, shared with the dashboard)
-```
+![AI Sports Coach: system overview](docs/overview.svg)
+
+- **Interfaces** (Streamlit, CLI) talk only to the **application layer** (`CoachService`), the one place that knows the agent harness.
+- The **agent harness** (Google ADK) runs two agents, the **Workout Agent** (chat) and the **Header Mapper** (upload). These are the only ⚡ LLM calls: **Gemini API** by default, Anthropic or OpenAI via LiteLLM.
+- The **domain** (statistics, import pipeline, tools, template) is deterministic Python, so the LLM decides and Python computes.
+
+**Details → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
+
+1. [What happens when a file is uploaded](docs/ARCHITECTURE.md#1-uploading-a-file)
+2. [How the dashboard graphs are computed](docs/ARCHITECTURE.md#2-computing-the-dashboard-graphs)
+3. [Chatting with the coach](docs/ARCHITECTURE.md#3-chatting-with-the-coach)
+4. [Where the LLM (Gemini API) is called](docs/ARCHITECTURE.md#where-the-llm-is-called)
 
 ## Layout
 

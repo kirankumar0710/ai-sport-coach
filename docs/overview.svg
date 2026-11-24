@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1260" height="640" viewBox="0 0 1260 640" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>AI Sports Coach: system overview</title>
+  <style>
+    .h { font-size: 17px; font-weight: 700; }
+    .s { font-size: 12.5px; fill: #475569; }
+    .i { font-size: 14px; font-weight: 600; fill: #0f172a; }
+    .m { font-size: 12px; font-family: 'SF Mono', Menlo, Consolas, monospace; fill: #334155; }
+    .lbl { font-size: 12.5px; font-weight: 700; fill: #475569; }
+    .box { stroke-width: 2; }
+    .inner { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; }
+    .arrow { fill: none; stroke: #64748b; stroke-width: 2; }
+    .llm { fill: none; stroke: #f59e0b; stroke-width: 4; }
+    .num { font-size: 11px; font-weight: 800; fill: #ffffff; text-anchor: middle; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <marker id="al" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b"/>
+    </marker>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity=".10"/>
+    </filter>
+  </defs>
+
+  <rect width="1260" height="640" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="30" y="44" font-size="26" font-weight="800" fill="#0f172a">AI Sports Coach: system overview</text>
+  <text x="30" y="70" class="s" font-size="14">Three flows through layered subsystems. The ⚡ marks are the only places a model (LLM) API is called.</text>
+
+  <!-- ================= Top row ================= -->
+  <!-- User -->
+  <g filter="url(#sh)">
+    <rect x="30" y="160" width="120" height="90" rx="14" fill="#f8fafc" stroke="#94a3b8" class="box"/>
+  </g>
+  <text x="90" y="198" class="h" text-anchor="middle" fill="#0f172a">User</text>
+  <text x="90" y="220" class="s" text-anchor="middle">files · questions</text>
+
+  <!-- Interfaces -->
+  <g filter="url(#sh)">
+    <rect x="200" y="110" width="210" height="190" rx="16" fill="#eef5fe" stroke="#2a78d6" class="box"/>
+  </g>
+  <text x="216" y="137" class="h" fill="#2a78d6">Interfaces</text>
+  <text x="216" y="156" class="s">Streamlit app · CLI</text>
+  <rect x="214" y="168" width="182" height="34" rx="9" class="inner"/>
+  <circle cx="232" cy="185" r="9" fill="#128a5f"/><text x="232" y="189" class="num">1</text>
+  <text x="248" y="190" class="i">Upload</text>
+  <rect x="214" y="210" width="182" height="34" rx="9" class="inner"/>
+  <circle cx="232" cy="227" r="9" fill="#2a78d6"/><text x="232" y="231" class="num">2</text>
+  <text x="248" y="232" class="i">Dashboard</text>
+  <rect x="214" y="252" width="182" height="34" rx="9" class="inner"/>
+  <circle cx="232" cy="269" r="9" fill="#6250d6"/><text x="232" y="273" class="num">3</text>
+  <text x="248" y="274" class="i">Coach chat</text>
+
+  <!-- Application layer -->
+  <g filter="url(#sh)">
+    <rect x="470" y="150" width="180" height="110" rx="16" fill="#f2f0fd" stroke="#6250d6" class="box"/>
+  </g>
+  <text x="486" y="178" class="h" fill="#6250d6">Application layer</text>
+  <text x="486" y="203" class="m">CoachService</text>
+  <text x="486" y="226" class="s">the only code that</text>
+  <text x="486" y="243" class="s">knows the harness</text>
+
+  <!-- Agent harness -->
+  <g filter="url(#sh)">
+    <rect x="710" y="110" width="250" height="190" rx="16" fill="#eaf7f1" stroke="#128a5f" class="box"/>
+  </g>
+  <text x="726" y="137" class="h" fill="#128a5f">Agent harness</text>
+  <text x="726" y="156" class="s">Google ADK · Runner + sessions</text>
+  <rect x="724" y="168" width="222" height="56" rx="9" class="inner"/>
+  <text x="738" y="191" class="i">Workout Agent ⚡</text>
+  <text x="738" y="211" class="s">coaching, answers via tools</text>
+  <rect x="724" y="232" width="222" height="56" rx="9" class="inner"/>
+  <text x="738" y="255" class="i">Header Mapper Agent ⚡</text>
+  <text x="738" y="275" class="s">file headers → template (JSON)</text>
+
+  <!-- LLM providers -->
+  <g filter="url(#sh)">
+    <rect x="1040" y="110" width="190" height="190" rx="16" fill="#fff8eb" stroke="#f59e0b" class="box"/>
+  </g>
+  <text x="1056" y="137" class="h" fill="#b45309">LLM providers</text>
+  <text x="1056" y="156" class="s">picked by PROVIDER env var</text>
+  <rect x="1054" y="168" width="162" height="50" rx="9" fill="#ffffff" stroke="#1a73e8" stroke-width="2.5"/>
+  <text x="1068" y="190" class="i" fill="#1a73e8">Gemini API</text>
+  <text x="1068" y="208" class="s">default · native in ADK</text>
+  <rect x="1054" y="226" width="162" height="50" rx="9" class="inner"/>
+  <text x="1068" y="248" class="i">Anthropic · OpenAI</text>
+  <text x="1068" y="266" class="s">via LiteLLM adapter</text>
+  <text x="1056" y="292" class="s" font-size="11.5">key from *_API_KEY in shell</text>
+
+  <!-- ================= Bottom row ================= -->
+  <g filter="url(#sh)">
+    <rect x="200" y="380" width="760" height="150" rx="16" fill="#f4f6f9" stroke="#475569" class="box"/>
+  </g>
+  <text x="216" y="408" class="h" fill="#475569">Domain <tspan class="s" font-weight="400">deterministic Python, no model calls</tspan></text>
+
+  <rect x="212" y="424" width="175" height="90" rx="10" class="inner"/>
+  <text x="226" y="448" class="i">Statistics</text>
+  <text x="226" y="467" class="m">workouts.py</text>
+  <text x="226" y="489" class="s">totals, pace, weekly</text>
+  <text x="226" y="504" class="s">trends, 10% jump flags</text>
+
+  <rect x="399" y="424" width="175" height="90" rx="10" class="inner"/>
+  <text x="413" y="448" class="i">Import pipeline</text>
+  <text x="413" y="467" class="m">ingest/</text>
+  <text x="413" y="489" class="s">read, map, convert</text>
+  <text x="413" y="504" class="s">units, skip bad rows</text>
+
+  <rect x="586" y="424" width="175" height="90" rx="10" class="inner"/>
+  <text x="600" y="448" class="i">Function tools</text>
+  <text x="600" y="467" class="m">tools/</text>
+  <text x="600" y="489" class="s">agent-callable wrappers</text>
+  <text x="600" y="504" class="s">over workouts.py</text>
+
+  <rect x="773" y="424" width="175" height="90" rx="10" class="inner"/>
+  <text x="787" y="448" class="i">Workout template</text>
+  <text x="787" y="467" class="m">schema.py</text>
+  <text x="787" y="489" class="s">the one stored CSV</text>
+  <text x="787" y="504" class="s">format</text>
+
+  <!-- Data -->
+  <g filter="url(#sh)">
+    <path d="M1040,408 a95,14 0 0 0 190,0 v86 a95,14 0 0 1 -190,0 z" fill="#fdf7e9" stroke="#b7791f" stroke-width="2"/>
+    <ellipse cx="1135" cy="408" rx="95" ry="14" fill="#fdf7e9" stroke="#b7791f" stroke-width="2"/>
+  </g>
+  <text x="1135" y="452" class="i" text-anchor="middle">data/workouts/</text>
+  <text x="1135" y="472" class="s" text-anchor="middle">template CSVs</text>
+  <text x="1135" y="489" class="s" text-anchor="middle">+ mapping cache</text>
+
+  <!-- ================= Arrows ================= -->
+  <!-- user -> interfaces -->
+  <path d="M150,205 H196" class="arrow" marker-end="url(#a)"/>
+  <!-- (3) interfaces -> application -->
+  <path d="M410,269 H440 V215 H466" class="arrow" marker-end="url(#a)"/>
+  <circle cx="440" cy="242" r="9" fill="#6250d6"/><text x="440" y="246" class="num">3</text>
+  <!-- application -> harness -->
+  <path d="M650,205 H706" class="arrow" marker-end="url(#a)"/>
+  <text x="678" y="196" class="lbl" text-anchor="middle">run</text>
+  <!-- harness -> LLM (highlighted) -->
+  <path d="M960,205 H1032" class="llm" marker-end="url(#al)"/>
+  <text x="999" y="192" class="lbl" text-anchor="middle" fill="#b45309">⚡ LLM calls</text>
+
+  <!-- (2) interfaces -> statistics -->
+  <path d="M300,300 V376" class="arrow" marker-end="url(#a)"/>
+  <circle cx="300" cy="340" r="9" fill="#2a78d6"/><text x="300" y="344" class="num">2</text>
+  <!-- (1) interfaces -> import -->
+  <path d="M380,300 V340 H470 V376" class="arrow" marker-end="url(#a)"/>
+  <circle cx="425" cy="340" r="9" fill="#128a5f"/><text x="425" y="344" class="num">1</text>
+  <!-- (1) import -> application: header mapping, only when needed -->
+  <path d="M545,380 V264" class="arrow" stroke-dasharray="6 5" marker-end="url(#a)"/>
+  <text x="553" y="328" class="lbl" fill="#128a5f">map headers</text>
+  <text x="553" y="344" class="s" font-size="11.5">unknown formats only</text>
+  <!-- (3) harness -> tools -->
+  <path d="M735,300 V376" class="arrow" marker-end="url(#a)"/>
+  <circle cx="735" cy="340" r="9" fill="#6250d6"/><text x="735" y="344" class="num">3</text>
+  <text x="749" y="344" class="lbl">tool calls</text>
+  <!-- domain -> data -->
+  <path d="M960,450 H1036" class="arrow" marker-end="url(#a)"/>
+  <text x="998" y="440" class="lbl" text-anchor="middle">read / write</text>
+
+  <!-- ================= Legend ================= -->
+  <rect x="30" y="556" width="1200" height="56" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+  <circle cx="58" cy="584" r="10" fill="#128a5f"/><text x="58" y="588" class="num">1</text>
+  <text x="76" y="589" class="i">Upload: file → template CSV (⚡ once per new file format)</text>
+  <circle cx="478" cy="584" r="10" fill="#2a78d6"/><text x="478" y="588" class="num">2</text>
+  <text x="496" y="589" class="i">Dashboard: statistics only, no LLM</text>
+  <circle cx="752" cy="584" r="10" fill="#6250d6"/><text x="752" y="588" class="num">3</text>
+  <text x="770" y="589" class="i">Chat: agent ⚡ ↔ tools loop</text>
+  <path d="M990,584 H1030" class="llm" marker-end="url(#al)"/>
+  <text x="1040" y="589" class="i">model API call</text>
+</svg>

@@ -3,6 +3,8 @@
     streamlit run app.py
 """
 
+from pathlib import Path
+
 import streamlit as st
 
 from sport_coach import ingest, workouts
@@ -11,7 +13,13 @@ from sport_coach.service import SyncCoachService
 from sport_coach.ui import chat, dashboard, uploads
 from sport_coach.workouts import WorkoutDataError
 
-st.set_page_config(page_title="AI Sports Coach", page_icon="🏃", layout="wide")
+ASSETS = Path(__file__).parent / "assets"
+LOGO = str(ASSETS / "logo.png")          # full logo: page title, README
+ICON = str(ASSETS / "icon.png")          # robot head: readable at small sizes (sidebar)
+FAVICON = str(ASSETS / "favicon.png")    # robot head: browser tab
+
+st.set_page_config(page_title="AI Sports Coach", page_icon=FAVICON, layout="wide")
+st.logo(ICON, size="large", icon_image=ICON)
 
 
 @st.cache_resource(show_spinner=False)
@@ -35,7 +43,7 @@ data_dir = settings.data_dir
 
 # --- Sidebar: upload + file selection --------------------------------------
 with st.sidebar:
-    st.header("🏃 Workouts")
+    st.header("Workouts")
 
     upload = st.file_uploader(
         "Upload workouts (CSV or Excel)", type=list(ingest.UPLOAD_TYPES)
@@ -76,7 +84,9 @@ with st.sidebar:
     st.caption(f"Model: {settings.provider.name} · {settings.provider.model}")
 
 # --- Main area -------------------------------------------------------------
-st.title(settings.app_name)
+title_logo, title_text = st.columns([1, 11], vertical_alignment="center")
+title_logo.image(LOGO, width=84)
+title_text.title(settings.app_name)
 
 uploads.render_notice()
 
