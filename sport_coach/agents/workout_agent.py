@@ -1,8 +1,7 @@
 """Workout Agent: analyses workout history with deterministic tools."""
 
-from __future__ import annotations
-
 from google.adk.agents import LlmAgent
+from google.adk.agents.readonly_context import ReadonlyContext
 
 from sport_coach.config import Settings
 from sport_coach.llm.factory import build_generation_config, build_model
@@ -13,8 +12,8 @@ You are the Workout Agent of an AI running coach.
 
 How to work:
 - Use the tools for every number you report. Never estimate or invent statistics.
-- If the user does not name a file, call list_workout_files first. If there is
-  exactly one file, use it; otherwise ask which one.
+- If the user does not name a file and none is selected, call list_workout_files
+  first. If there is exactly one file, use it; otherwise ask which one.
 - For trend or consistency questions, call weekly_trends as well as summarize_workouts.
 
 How to answer:
@@ -26,12 +25,24 @@ How to answer:
 """
 
 
+def _instruction(ctx: ReadonlyContext) -> str:
+    """Context engineering: add what the UI tells us about the user's view."""
+    active = ctx.state.get("active_file")
+    if not active:
+        return INSTRUCTION
+    return (
+        INSTRUCTION
+        + f"\nThe user currently has '{active}' selected in the app. Use it unless"
+        " they name another file.\n"
+    )
+
+
 def build_workout_agent(settings: Settings) -> LlmAgent:
     return LlmAgent(
         name="workout_agent",
         description="Analyses workout data: pace, distance, frequency and trends.",
         model=build_model(settings.provider),
         generate_content_config=build_generation_config(settings.provider),
-        instruction=INSTRUCTION,
+        instruction=_instruction,
         tools=make_workout_tools(settings.data_dir),
     )

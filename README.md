@@ -33,25 +33,60 @@ The TOML file only stores the *name* of each key's environment variable
 ## Run
 
 ```bash
-python -m sport_coach.cli              # console chat via the ADK Runner
-python -m sport_coach.cli --trace      # also print tool calls and results
-adk web adk_apps                       # ADK dev UI (run from the repo root)
+streamlit run app.py                  # web app: upload, dashboard, coach chat
+python -m sport_coach.cli --trace     # console chat (prints tool calls)
 ```
 
-Try: *"Analyse my workouts and tell me how consistent I've been."*
+The web app has:
+- **Upload**: a workout CSV in the sidebar. It's validated before saving; invalid files are rejected with the line number.
+- **Dashboard**: workouts, distance, time, average pace, workouts per week and longest run.
+  Charts show weekly distance (weeks with more than a 10% jump are flagged), pace per run,
+  long-run progression and workouts per week, with a period filter and table views.
+- **Coach**: chat with the agent about the selected file, with live tool-call status.
+
+The dashboard works without an API key; only the chat needs one.
+
+### Workout CSV format
+
+| column | required | example |
+|---|---|---|
+| `date` | yes | `2026-09-01` |
+| `distance_km` | yes | `5.0` |
+| `duration_min` | yes | `29.5` |
+| `activity` | no | `run` |
+| `calories` | no | `360` |
+
+Uploads are saved in `data/workouts/`. Git ignores them because they're personal data;
+only `sample_runs.csv` is tracked.
+
+## Architecture
+
+```
+app.py (Streamlit) / sport_coach/cli.py      our interfaces: no ADK imports
+            │  CoachEvent (tool_call / tool_result / message)
+sport_coach/service.py   CoachService        application layer; the only place that knows ADK
+            │
+ADK Runner + workout_agent                   harness (replaceable)
+            │                    │
+llm/factory.py               tools/workout_tools.py → workouts.py
+(Gemini | LiteLLM)           (deterministic statistics, shared with the dashboard)
+```
 
 ## Layout
 
 ```
+app.py                          Streamlit entry point
 requirements.txt                dependencies
 config/settings.toml            vendors, models, params (no secrets)
 sport_coach/config.py           TOML + env loading → Settings
+sport_coach/service.py          CoachService (async) + SyncCoachService (for Streamlit)
+sport_coach/workouts.py         CSV parsing, validation, storage, statistics
 sport_coach/llm/factory.py      provider registry → ADK model (native Gemini / LiteLlm)
-sport_coach/tools/              deterministic workout analytics (function tools)
+sport_coach/tools/              function tools wrapping workouts.py
 sport_coach/agents/             agents (Phase 1: workout_agent)
-sport_coach/cli.py              Runner + session + event loop
-adk_apps/coach/                 `root_agent` entry point for `adk web` / `adk run`
-data/workouts/                  workout CSVs (date, activity, distance_km, duration_min, calories)
+sport_coach/ui/                 dashboard and chat components
+sport_coach/cli.py              console interface
+data/workouts/                  workout CSVs
 ```
 
 ### Adding a provider
@@ -59,7 +94,7 @@ data/workouts/                  workout CSVs (date, activity, distance_km, durat
 1. Add a `[llm.providers.<name>]` section to `settings.toml`.
 2. Register a builder in `llm/factory.py` with `@register_provider("<name>")`.
 
-You don't need to change any agents or tools.
+You don't need to change any agents, tools or UI.
 
 ## Tests
 

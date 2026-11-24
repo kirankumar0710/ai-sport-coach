@@ -5,3 +5,7 @@ __pycache__/
 .pytest_cache/
 .env
 config/*.local.toml
+
+# Uploaded workouts are personal data; only the sample is tracked.
+data/workouts/*
+!data/workouts/sample_runs.csv

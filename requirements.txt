@@ -1,3 +1,4 @@
 google-adk>=2.15.0   # agent harness (cycle 1)
 litellm>=1.110.0     # bridges ADK to Anthropic / OpenAI
+streamlit>=1.67.0    # web UI (brings pandas + altair for the dashboard)
 pytest>=8            # tests

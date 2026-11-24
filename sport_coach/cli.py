@@ -1,37 +1,26 @@
-"""Interactive console coach built on the ADK Runner.
+"""Interactive console coach.
 
     export PROVIDER=gemini GEMINI_API_KEY=...
     python -m sport_coach.cli
     python -m sport_coach.cli --trace   # also print tool calls / results
 """
 
-from __future__ import annotations
-
 import argparse
 import asyncio
 import sys
 
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
-
-from sport_coach.agents.workout_agent import build_workout_agent
 from sport_coach.config import ConfigError, load_settings
+from sport_coach.service import CoachService
 
-APP_NAME = "sport_coach"
 USER_ID = "local_user"
 
 
 async def chat(trace: bool) -> None:
     settings = load_settings()
-    agent = build_workout_agent(settings)
+    coach = CoachService(settings)
+    session_id = await coach.new_session(USER_ID)
 
-    session_service = InMemorySessionService()
-    runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
-    session = await session_service.create_session(app_name=APP_NAME, user_id=USER_ID)
-
-    print(f"{settings.app_name} — provider: {settings.provider.name} "
-          f"({settings.provider.model}). Type 'exit' to quit.\n")
+    print(f"{settings.app_name} — {coach.provider_label}. Type 'exit' to quit.\n")
 
     while True:
         try:
@@ -44,18 +33,13 @@ async def chat(trace: bool) -> None:
         if text.lower() in {"exit", "quit"}:
             return
 
-        message = types.Content(role="user", parts=[types.Part(text=text)])
-        async for event in runner.run_async(
-            user_id=USER_ID, session_id=session.id, new_message=message
-        ):
-            if trace:
-                for call in event.get_function_calls():
-                    print(f"  [tool call] {call.name}({dict(call.args or {})})")
-                for resp in event.get_function_responses():
-                    print(f"  [tool result] {resp.name}: {str(resp.response)[:200]}")
-            if event.is_final_response() and event.content and event.content.parts:
-                reply = "".join(p.text or "" for p in event.content.parts)
-                print(f"\ncoach> {reply}\n")
+        async for ev in coach.chat(USER_ID, session_id, text):
+            if trace and ev.kind == "tool_call":
+                print(f"  [tool call] {ev.name}({ev.data})")
+            elif trace and ev.kind == "tool_result":
+                print(f"  [tool result] {ev.name}: {str(ev.data)[:200]}")
+            elif ev.kind == "message" and ev.final:
+                print(f"\ncoach> {ev.text}\n")
 
 
 def main() -> None:
